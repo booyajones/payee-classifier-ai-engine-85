@@ -98,6 +98,19 @@ system waits for each API response. You can override this timeout by setting the
 `OPENAI_TIMEOUT_MS` environment variable or by passing a `timeout` parameter to
 the classification functions.
 
+## Running Tests
+
+To run the unit tests locally:
+
+```sh
+npm install
+npm test
+```
+
+The tests execute in offline mode, so no API keys or other environment
+variables are required. If you later enable online mode, you can optionally set
+`OPENAI_TIMEOUT_MS` to customize the API timeout.
+
 Increasing `aiThreshold` means rule‑based and NLP results must be more confident
 before the AI model is called. A higher threshold typically improves accuracy at
 the cost of additional API usage and slower processing. Likewise, extending
