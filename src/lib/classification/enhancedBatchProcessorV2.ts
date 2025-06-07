@@ -17,7 +17,8 @@ export interface BatchRow {
 export async function enhancedProcessBatchV2(
   rows: BatchRow[],
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG,
-  onProgress?: (processed: number, total: number, current: string) => void
+  onProgress?: (processed: number, total: number, current: string) => void,
+  payeeColumnName?: string
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   const results: PayeeClassification[] = [];
@@ -200,6 +201,7 @@ export async function enhancedProcessBatchV2(
     results,
     successCount: results.filter(r => r.result.processingTier !== 'Failed').length,
     failureCount: results.filter(r => r.result.processingTier === 'Failed').length,
+    payeeColumnName,
     processingTime,
     originalFileData: rows.map(row => row.originalData),
     enhancedStats

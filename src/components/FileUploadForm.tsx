@@ -10,7 +10,12 @@ import FileUploadActions from "./file-upload/FileUploadActions";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 
 interface FileUploadFormProps {
-  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
+  onBatchJobCreated: (
+    batchJob: BatchJob,
+    payeeNames: string[],
+    originalFileData: any[],
+    payeeColumnName: string
+  ) => void;
 }
 
 const FileUploadForm = ({ onBatchJobCreated }: FileUploadFormProps) => {
@@ -113,7 +118,8 @@ const FileUploadForm = ({ onBatchJobCreated }: FileUploadFormProps) => {
       await onBatchJobCreated(
         mockBatchJob,
         validationResult.payeeNames,
-        validationResult.originalData || []
+        validationResult.originalData || [],
+        selectedColumn
       );
     } catch (error) {
       console.error('Submit error:', error);

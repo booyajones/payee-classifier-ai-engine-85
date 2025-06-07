@@ -123,12 +123,12 @@ export function exportResultsWithOriginalDataV3(
 
   // Validate data alignment first
   const firstOriginalRow = batchResult.originalFileData[0];
-  const payeeColumnName = firstOriginalRow ? Object.keys(firstOriginalRow).find(key =>
+  const payeeColumnName = batchResult.payeeColumnName || (firstOriginalRow ? Object.keys(firstOriginalRow).find(key =>
     key.toLowerCase().includes('payee') ||
     key.toLowerCase().includes('name') ||
     key.toLowerCase().includes('supplier') ||
     key.toLowerCase().includes('vendor')
-  ) : undefined;
+  ) : undefined);
 
   const validation = validateDataAlignment(
     batchResult.originalFileData,

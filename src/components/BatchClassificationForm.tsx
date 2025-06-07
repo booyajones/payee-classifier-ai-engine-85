@@ -19,11 +19,17 @@ const BatchClassificationForm = ({ onComplete }: BatchClassificationFormProps) =
   const [batchJobs, setBatchJobs] = useState<BatchJob[]>([]);
   const [payeeNamesMap, setPayeeNamesMap] = useState<Record<string, string[]>>({});
   const [originalFileDataMap, setOriginalFileDataMap] = useState<Record<string, any[]>>({});
+  const [payeeColumnMap, setPayeeColumnMap] = useState<Record<string, string>>({});
   const [batchResults, setBatchResults] = useState<PayeeClassification[]>([]);
   const [processingSummary, setProcessingSummary] = useState<BatchProcessingResult | null>(null);
   const { toast } = useToast();
 
-  const handleBatchJobCreated = (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => {
+  const handleBatchJobCreated = (
+    batchJob: BatchJob,
+    payeeNames: string[],
+    originalFileData: any[],
+    payeeColumnName: string
+  ) => {
     console.log(`[BATCH FORM] Batch job created with ${payeeNames.length} payees and ${originalFileData.length} original data rows`);
     console.log(`[BATCH FORM] Original data sample:`, originalFileData.slice(0, 2));
     
@@ -32,11 +38,17 @@ const BatchClassificationForm = ({ onComplete }: BatchClassificationFormProps) =
       ...prev,
       [batchJob.id]: payeeNames
     }));
-    
+
     // Store original file data for this job - CRITICAL for export
     setOriginalFileDataMap(prev => ({
       ...prev,
       [batchJob.id]: originalFileData
+    }));
+
+    // Store the payee column name
+    setPayeeColumnMap(prev => ({
+      ...prev,
+      [batchJob.id]: payeeColumnName
     }));
     
     console.log(`[BATCH FORM] Stored original file data for job ${batchJob.id}:`, {
@@ -77,6 +89,10 @@ const BatchClassificationForm = ({ onComplete }: BatchClassificationFormProps) =
       const { [jobId]: removed, ...rest } = prev;
       return rest;
     });
+    setPayeeColumnMap(prev => {
+      const { [jobId]: removed, ...rest } = prev;
+      return rest;
+    });
   };
 
   const handleReset = () => {
@@ -110,6 +126,7 @@ const BatchClassificationForm = ({ onComplete }: BatchClassificationFormProps) =
           jobs={batchJobs}
           payeeNamesMap={payeeNamesMap}
           originalFileDataMap={originalFileDataMap}
+          payeeColumnNameMap={payeeColumnMap}
           onJobUpdate={handleJobUpdate}
           onJobComplete={handleJobComplete}
           onJobDelete={handleJobDelete}

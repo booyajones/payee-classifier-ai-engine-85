@@ -41,7 +41,8 @@ export const downloadCSV = (results: PayeeClassification[]) => {
     results,
     successCount: results.filter(r => r.result.processingTier !== 'Failed').length,
     failureCount: results.filter(r => r.result.processingTier === 'Failed').length,
-    originalFileData: results.map(r => r.originalData)
+    originalFileData: results.map(r => r.originalData),
+    payeeColumnName: undefined
   };
 
   const exportRows = exportResultsWithOriginalDataV3(summary, true);

@@ -38,6 +38,7 @@ export interface BatchProcessingResult {
   results: PayeeClassification[];
   successCount: number;
   failureCount: number;
+  payeeColumnName?: string;
   processingTime?: number;
   originalFileData?: any[]; // Preserve original file structure
   enhancedStats?: EnhancedBatchStatistics;

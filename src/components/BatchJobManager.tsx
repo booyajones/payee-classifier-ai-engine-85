@@ -15,18 +15,20 @@ interface BatchJobManagerProps {
   jobs: BatchJob[];
   payeeNamesMap: Record<string, string[]>;
   originalFileDataMap: Record<string, any[]>;
+  payeeColumnNameMap: Record<string, string>;
   onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
   onJobDelete: (jobId: string) => void;
 }
 
-const BatchJobManager = ({ 
-  jobs, 
-  payeeNamesMap, 
+const BatchJobManager = ({
+  jobs,
+  payeeNamesMap,
   originalFileDataMap,
-  onJobUpdate, 
-  onJobComplete, 
-  onJobDelete 
+  payeeColumnNameMap,
+  onJobUpdate,
+  onJobComplete,
+  onJobDelete
 }: BatchJobManagerProps) => {
   const [refreshingJobs, setRefreshingJobs] = useState<Set<string>>(new Set());
   const [downloadingJobs, setDownloadingJobs] = useState<Set<string>>(new Set());
@@ -77,6 +79,7 @@ const BatchJobManager = ({
       console.log(`[BATCH MANAGER] Downloading results for job ${job.id} with GUARANTEED alignment`);
       const payeeNames = payeeNamesMap[job.id] || [];
       const originalFileData = originalFileDataMap[job.id] || [];
+      const payeeColumnName = payeeColumnNameMap[job.id];
       
       console.log(`[BATCH MANAGER] Data verification:`, {
         payeeNamesLength: payeeNames.length,
@@ -163,7 +166,8 @@ const BatchJobManager = ({
         results: classifications,
         successCount,
         failureCount,
-        originalFileData
+        originalFileData,
+        payeeColumnName
       };
 
       onJobComplete(classifications, summary, job.id);

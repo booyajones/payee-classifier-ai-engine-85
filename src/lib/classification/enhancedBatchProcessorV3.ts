@@ -13,7 +13,8 @@ import { exportResultsWithOriginalDataV3 } from './batchExporter';
 export async function enhancedProcessBatchV3(
   payeeNames: string[],
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG,
-  originalFileData?: any[]
+  originalFileData?: any[],
+  payeeColumnName?: string
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   
@@ -103,6 +104,7 @@ export async function enhancedProcessBatchV3(
     failureCount: 0, // NO FAILURES!
     processingTime,
     originalFileData,
+    payeeColumnName,
     enhancedStats
   };
 }
