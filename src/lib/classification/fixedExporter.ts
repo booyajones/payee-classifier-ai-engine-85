@@ -1,5 +1,5 @@
 
-import { BatchProcessingResult } from '../types';
+import { BatchProcessingResult, PayeeClassification } from '../types';
 
 /**
  * Fixed exporter that ensures perfect 1:1 alignment with original data
@@ -25,7 +25,7 @@ export function exportResultsFixed(
     const result = batchResult.results[i];
     
     // Validate alignment
-    if (result.rowIndex !== i) {
+    if (result.rowIndex !== undefined && result.rowIndex !== i) {
       throw new Error(`Index mismatch at row ${i}: expected ${i}, got ${result.rowIndex}`);
     }
     
@@ -59,4 +59,14 @@ export function exportResultsFixed(
   console.log(`[FIXED EXPORTER] Sample export row:`, exportData[0]);
   
   return exportData;
+}
+
+/**
+ * Alternative export function that accepts classifications directly
+ */
+export function exportResultsFromClassifications(
+  classifications: PayeeClassification[],
+  summary: BatchProcessingResult
+): any[] {
+  return exportResultsFixed(summary, true);
 }

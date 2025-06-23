@@ -67,7 +67,17 @@ const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
 
   const handleExport = async (result: StoredBatchResult) => {
     try {
-      await exportResultsFixed(result.classifications, result.summary);
+      // Create a proper BatchProcessingResult structure for the export function
+      const batchResult: BatchProcessingResult = {
+        results: result.classifications,
+        successCount: result.total_payees - result.error_count,
+        failureCount: result.error_count,
+        processingTime: result.processing_time_ms,
+        originalFileData: result.summary.originalFileData,
+        enhancedStats: result.summary.enhancedStats
+      };
+      
+      await exportResultsFixed(batchResult, true);
       toast({
         title: "Success",
         description: "Results exported successfully"
