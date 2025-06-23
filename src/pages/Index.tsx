@@ -12,6 +12,7 @@ import { isOpenAIInitialized } from "@/lib/openai/client";
 import { ProcessingProvider } from "@/contexts/ProcessingContext";
 import { StoredBatchResult } from "@/lib/storage/resultStorage";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import ClassificationErrorBoundary from "@/components/ClassificationErrorBoundary";
 
 const Index = () => {
   console.log('[INDEX] Index page rendering...');
@@ -53,9 +54,9 @@ const Index = () => {
               <ThemeToggle />
             </div>
 
-            <ErrorBoundary context="Live Progress Dashboard">
+            <ClassificationErrorBoundary context="Live Progress Dashboard">
               <LiveProgressDashboard />
-            </ErrorBoundary>
+            </ClassificationErrorBoundary>
 
             <Tabs defaultValue="classification" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
@@ -65,25 +66,25 @@ const Index = () => {
               </TabsList>
               
               <TabsContent value="classification" className="mt-6">
-                <ErrorBoundary context="Batch Classification">
+                <ClassificationErrorBoundary context="Batch Classification">
                   <BatchClassificationForm 
                     onComplete={handleClassificationComplete}
                     onApiKeySet={handleApiKeySet}
                     onApiKeyChange={handleApiKeyChange}
                   />
-                </ErrorBoundary>
+                </ClassificationErrorBoundary>
               </TabsContent>
               
               <TabsContent value="keywords" className="mt-6">
-                <ErrorBoundary context="Keyword Exclusions">
+                <ClassificationErrorBoundary context="Keyword Exclusions">
                   <KeywordExclusionManager />
-                </ErrorBoundary>
+                </ClassificationErrorBoundary>
               </TabsContent>
               
               <TabsContent value="history" className="mt-6">
-                <ErrorBoundary context="Processing History">
+                <ClassificationErrorBoundary context="Processing History">
                   <ProcessingHistory onResultSelect={handleHistoryResultSelect} />
-                </ErrorBoundary>
+                </ClassificationErrorBoundary>
               </TabsContent>
             </Tabs>
           </div>
