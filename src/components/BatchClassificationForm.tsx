@@ -121,17 +121,25 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         processedRows: originalFileData.length
       });
       
-      // Save results to database
+      // Try to save results to database, but don't fail if it's not configured
       try {
-        await saveProcessingResults(result.results, result, jobId, 'direct');
-        console.log('[BATCH FORM] Results saved to database successfully');
+        const { saveProcessingResults, isSupabaseConfigured } = await import('@/lib/storage/resultStorage');
+        if (isSupabaseConfigured()) {
+          await saveProcessingResults(result.results, result, jobId, 'direct');
+          console.log('[BATCH FORM] Results saved to database successfully');
+        } else {
+          console.log('[BATCH FORM] Database not configured, skipping save');
+        }
       } catch (dbError) {
         console.error('[BATCH FORM] Failed to save results to database:', dbError);
-        toast({
-          title: "Warning",
-          description: "Processing completed but failed to save to database. Results are still available for export.",
-          variant: "destructive"
-        });
+        // Only show warning if it's not a configuration issue
+        if (!dbError?.message?.includes('Database not configured')) {
+          toast({
+            title: "Warning",
+            description: "Processing completed but failed to save to database. Results are still available for export.",
+            variant: "destructive"
+          });
+        }
       }
       
       // Remove from active jobs after a short delay
@@ -192,17 +200,24 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     setProcessingSummary(summary);
     onComplete(results, summary);
     
-    // Save batch API results to database
+    // Try to save batch API results to database
     try {
-      await saveProcessingResults(results, summary, jobId, 'batch');
-      console.log('[BATCH FORM] Batch API results saved to database successfully');
+      const { saveProcessingResults, isSupabaseConfigured } = await import('@/lib/storage/resultStorage');
+      if (isSupabaseConfigured()) {
+        await saveProcessingResults(results, summary, jobId, 'batch');
+        console.log('[BATCH FORM] Batch API results saved to database successfully');
+      } else {
+        console.log('[BATCH FORM] Database not configured, skipping save');
+      }
     } catch (dbError) {
       console.error('[BATCH FORM] Failed to save batch results to database:', dbError);
-      toast({
-        title: "Warning",
-        description: "Batch processing completed but failed to save to database. Results are still available for export.",
-        variant: "destructive"
-      });
+      if (!dbError?.message?.includes('Database not configured')) {
+        toast({
+          title: "Warning",
+          description: "Batch processing completed but failed to save to database. Results are still available for export.",
+          variant: "destructive"
+        });
+      }
     }
   };
 

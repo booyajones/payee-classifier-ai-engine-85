@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Download, Trash2, Eye, History, AlertCircle } from 'lucide-react';
-import { StoredBatchResult, getProcessingHistory, deleteResult } from '@/lib/storage/resultStorage';
+import { Loader2, Download, Trash2, Eye, History, AlertCircle, Database } from 'lucide-react';
+import { StoredBatchResult, getProcessingHistory, deleteResult, isSupabaseConfigured } from '@/lib/storage/resultStorage';
 import { exportResultsFixed } from '@/lib/classification/fixedExporter';
 import { BatchProcessingResult } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -26,6 +26,12 @@ const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      if (!isSupabaseConfigured()) {
+        setError('Database not configured');
+        return;
+      }
+      
       console.log('[PROCESSING HISTORY] Loading history...');
       const results = await getProcessingHistory();
       console.log('[PROCESSING HISTORY] Loaded results:', results.length);
@@ -35,8 +41,8 @@ const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(errorMessage);
       
-      // Don't show error toast for missing table - that's expected
-      if (!errorMessage.includes('relation "processing_results" does not exist')) {
+      // Don't show error toast for missing configuration - that's expected
+      if (!errorMessage.includes('Database not configured')) {
         toast({
           title: "Error",
           description: "Failed to load processing history",
@@ -131,14 +137,14 @@ const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
         </CardHeader>
         <CardContent>
           <Alert>
-            <AlertCircle className="h-4 w-4" />
+            <Database className="h-4 w-4" />
             <AlertDescription>
-              {error.includes('relation "processing_results" does not exist') ? (
+              {error.includes('Database not configured') ? (
                 <>
-                  Database table not found. The processing history feature requires a Supabase database setup.
+                  Database not configured. The processing history feature requires a Supabase database setup.
                   <br />
                   <span className="text-sm text-muted-foreground mt-2 block">
-                    Complete some batch processing first, or set up the required database table.
+                    Click the green Supabase button in the top right to set up your database, or continue using the app without persistent storage.
                   </span>
                 </>
               ) : (
