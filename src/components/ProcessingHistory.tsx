@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Download, Trash2, Eye, History } from 'lucide-react';
 import { StoredBatchResult, getProcessingHistory, deleteResult } from '@/lib/storage/resultStorage';
 import { exportResultsFixed } from '@/lib/classification/fixedExporter';
+import { BatchProcessingResult } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
