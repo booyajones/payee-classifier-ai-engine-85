@@ -634,7 +634,7 @@ export function checkKeywordExclusion(
 
     // Simple contains matching
     if (normalizedName.includes(normalizedKeyword)) {
-      console.log(`[KEYWORD EXCLUSION] MATCH FOUND! "${payeeName}" contains keyword "${keyword}"`);
+      console.log(`[KEYWORD EXCLUSION] ✅ MATCH FOUND! "${payeeName}" contains keyword "${keyword}"`);
       return {
         isExcluded: true,
         matchedKeywords: [keyword],
@@ -643,7 +643,7 @@ export function checkKeywordExclusion(
     }
   }
 
-  console.log(`[KEYWORD EXCLUSION] No match found for "${payeeName}"`);
+  console.log(`[KEYWORD EXCLUSION] ❌ No match found for "${payeeName}"`);
   return {
     isExcluded: false,
     matchedKeywords: [],

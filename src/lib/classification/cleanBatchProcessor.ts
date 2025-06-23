@@ -81,7 +81,7 @@ export async function cleanProcessBatch(
           result: {
             classification: 'Business' as const,
             confidence: 95,
-            reasoning: `Excluded by keyword match: ${exclusionResult.matchedKeywords.join(', ')}`,
+            reasoning: `Excluded by keyword match: ${exclusionResult.matchedKeywords.join(', ')}. This payee contains business/institutional keywords that automatically classify it as a business entity.`,
             processingTier: 'Excluded' as const,
             processingMethod: 'Keyword exclusion'
           },
@@ -104,7 +104,7 @@ export async function cleanProcessBatch(
         result: {
           classification: aiResult.classification,
           confidence: aiResult.confidence,
-          reasoning: aiResult.reasoning,
+          reasoning: `AI Classification: ${aiResult.reasoning}`,
           processingTier: 'AI-Powered' as const,
           processingMethod: 'OpenAI Classification'
         },
