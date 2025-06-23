@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,9 +10,10 @@ import APIKeyInput from "./APIKeyInput";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
-import { cleanProcessBatch } from "@/lib/classification/cleanBatchProcessor";
+import { enhancedCleanProcessBatch } from "@/lib/classification/enhancedCleanBatchProcessor";
 import { exportResultsFixed } from "@/lib/classification/fixedExporter";
 import { usePersistentBatchJobs } from "@/hooks/usePersistentBatchJobs";
+import { useProcessing } from "@/contexts/ProcessingContext";
 
 interface BatchClassificationFormProps {
   onComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
@@ -28,12 +28,13 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const { addJob, updateJob, removeJob } = useProcessing();
 
   const {
     batchJobs,
     isLoading: jobsLoading,
-    addJob,
-    updateJob,
+    addJob: addPersistentJob,
+    updateJob: updatePersistentJob,
     deleteJob
   } = usePersistentBatchJobs();
 
@@ -74,13 +75,55 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const handleDirectProcessing = async (originalFileData: any[], selectedColumn: string) => {
     setIsProcessing(true);
     
+    // Create a unique job ID for tracking
+    const jobId = `direct-${Date.now()}`;
+    
+    // Add job to processing context
+    addJob({
+      id: jobId,
+      type: 'direct',
+      startTime: Date.now(),
+      totalRows: originalFileData.length,
+      processedRows: 0,
+      excludedCount: 0,
+      aiProcessedCount: 0,
+      errorCount: 0,
+      status: 'running'
+    });
+    
     try {
-      const result = await cleanProcessBatch(originalFileData, selectedColumn, {
-        aiThreshold: 75,
-        bypassRuleNLP: false,
-        useEnhanced: true,
-        offlineMode: false
+      const result = await enhancedCleanProcessBatch(
+        originalFileData, 
+        selectedColumn, 
+        {
+          aiThreshold: 75,
+          bypassRuleNLP: false,
+          useEnhanced: true,
+          offlineMode: false
+        },
+        // Progress callback
+        (current, total, stats) => {
+          updateJob(jobId, {
+            processedRows: current,
+            excludedCount: stats.excludedCount,
+            aiProcessedCount: stats.aiProcessedCount,
+            errorCount: stats.errorCount,
+            processingSpeed: stats.processingSpeed,
+            estimatedTimeRemaining: stats.estimatedTimeRemaining
+          });
+        }
+      );
+      
+      // Mark job as completed
+      updateJob(jobId, {
+        status: 'completed',
+        processedRows: originalFileData.length
       });
+      
+      // Remove from active jobs after a short delay
+      setTimeout(() => {
+        removeJob(jobId);
+      }, 5000);
       
       setBatchResults(result.results);
       setProcessingSummary(result);
@@ -92,6 +135,16 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       });
       
     } catch (error) {
+      // Mark job as failed
+      updateJob(jobId, {
+        status: 'failed'
+      });
+      
+      // Remove from active jobs after a short delay
+      setTimeout(() => {
+        removeJob(jobId);
+      }, 3000);
+      
       toast({
         title: "Processing Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -112,7 +165,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       return;
     }
     
-    await addJob(batchJob, payeeNames, originalFileData);
+    await addPersistentJob(batchJob, payeeNames, originalFileData);
     
     toast({
       title: "Batch Job Created",
@@ -185,7 +238,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       {batchJobs.length > 0 && (
         <BatchJobManager
           jobs={batchJobs}
-          onJobUpdate={updateJob}
+          onJobUpdate={updatePersistentJob}
           onJobComplete={handleJobComplete}
           onJobDelete={deleteJob}
         />

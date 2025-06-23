@@ -7,7 +7,7 @@ import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { StoredBatchJob, isValidBatchJobId } from "@/lib/storage/batchJobStorage";
 import ConfirmationDialog from "./ConfirmationDialog";
-import BatchJobCard from "./batch/BatchJobCard";
+import EnhancedBatchJobCard from "./batch/EnhancedBatchJobCard";
 import { useBatchJobActions } from "@/hooks/useBatchJobActions";
 
 interface BatchJobManagerProps {
@@ -148,7 +148,7 @@ const BatchJobManager = ({
           const payeeCount = job.payeeNames?.length || 0;
           
           return (
-            <BatchJobCard
+            <EnhancedBatchJobCard
               key={job.id}
               job={job}
               pollingState={pollingState}
