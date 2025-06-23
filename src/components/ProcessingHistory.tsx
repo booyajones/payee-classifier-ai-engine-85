@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Download, Trash2, Eye, History } from 'lucide-react';
+import { Loader2, Download, Trash2, Eye, History, AlertCircle } from 'lucide-react';
 import { StoredBatchResult, getProcessingHistory, deleteResult } from '@/lib/storage/resultStorage';
 import { exportResultsFixed } from '@/lib/classification/fixedExporter';
 import { BatchProcessingResult } from '@/lib/types';
@@ -18,21 +18,31 @@ interface ProcessingHistoryProps {
 const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
   const [history, setHistory] = useState<StoredBatchResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const loadHistory = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+      console.log('[PROCESSING HISTORY] Loading history...');
       const results = await getProcessingHistory();
+      console.log('[PROCESSING HISTORY] Loaded results:', results.length);
       setHistory(results);
     } catch (error) {
-      console.error('Failed to load history:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load processing history",
-        variant: "destructive"
-      });
+      console.error('[PROCESSING HISTORY] Failed to load history:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(errorMessage);
+      
+      // Don't show error toast for missing table - that's expected
+      if (!errorMessage.includes('relation "processing_results" does not exist')) {
+        toast({
+          title: "Error",
+          description: "Failed to load processing history",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -105,6 +115,37 @@ const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
         <CardContent className="flex items-center justify-center p-6">
           <Loader2 className="h-6 w-6 animate-spin mr-2" />
           Loading history...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Processing History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {error.includes('relation "processing_results" does not exist') ? (
+                <>
+                  Database table not found. The processing history feature requires a Supabase database setup.
+                  <br />
+                  <span className="text-sm text-muted-foreground mt-2 block">
+                    Complete some batch processing first, or set up the required database table.
+                  </span>
+                </>
+              ) : (
+                `Failed to load processing history: ${error}`
+              )}
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
