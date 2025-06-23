@@ -14,6 +14,7 @@ import { enhancedCleanProcessBatch } from "@/lib/classification/enhancedCleanBat
 import { exportResultsFixed } from "@/lib/classification/fixedExporter";
 import { usePersistentBatchJobs } from "@/hooks/usePersistentBatchJobs";
 import { useProcessing } from "@/contexts/ProcessingContext";
+import { saveProcessingResults } from "@/lib/storage/resultStorage";
 
 interface BatchClassificationFormProps {
   onComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
@@ -120,6 +121,19 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         processedRows: originalFileData.length
       });
       
+      // Save results to database
+      try {
+        await saveProcessingResults(result.results, result, jobId, 'direct');
+        console.log('[BATCH FORM] Results saved to database successfully');
+      } catch (dbError) {
+        console.error('[BATCH FORM] Failed to save results to database:', dbError);
+        toast({
+          title: "Warning",
+          description: "Processing completed but failed to save to database. Results are still available for export.",
+          variant: "destructive"
+        });
+      }
+      
       // Remove from active jobs after a short delay
       setTimeout(() => {
         removeJob(jobId);
@@ -173,10 +187,23 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     });
   };
 
-  const handleJobComplete = (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
+  const handleJobComplete = async (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
     setBatchResults(results);
     setProcessingSummary(summary);
     onComplete(results, summary);
+    
+    // Save batch API results to database
+    try {
+      await saveProcessingResults(results, summary, jobId, 'batch');
+      console.log('[BATCH FORM] Batch API results saved to database successfully');
+    } catch (dbError) {
+      console.error('[BATCH FORM] Failed to save batch results to database:', dbError);
+      toast({
+        title: "Warning",
+        description: "Batch processing completed but failed to save to database. Results are still available for export.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleReset = () => {

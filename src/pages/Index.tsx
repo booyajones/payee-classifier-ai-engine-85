@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,9 +5,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import BatchClassificationForm from "@/components/BatchClassificationForm";
 import KeywordExclusionManager from "@/components/KeywordExclusionManager";
 import LiveProgressDashboard from "@/components/LiveProgressDashboard";
+import ProcessingHistory from "@/components/ProcessingHistory";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { isOpenAIInitialized } from "@/lib/openai/client";
 import { ProcessingProvider } from "@/contexts/ProcessingContext";
+import { StoredBatchResult } from "@/lib/storage/resultStorage";
 
 const Index = () => {
   const [classificationResults, setClassificationResults] = useState<PayeeClassification[]>([]);
@@ -30,6 +31,11 @@ const Index = () => {
     setIsApiKeySet(true);
   };
 
+  const handleHistoryResultSelect = (result: StoredBatchResult) => {
+    setClassificationResults(result.classifications);
+    setLastProcessingSummary(result.summary);
+  };
+
   return (
     <ProcessingProvider>
       <div className="min-h-screen bg-background">
@@ -45,9 +51,10 @@ const Index = () => {
           <LiveProgressDashboard />
 
           <Tabs defaultValue="classification" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="classification">Batch Classification</TabsTrigger>
               <TabsTrigger value="keywords">Keyword Exclusions</TabsTrigger>
+              <TabsTrigger value="history">Processing History</TabsTrigger>
             </TabsList>
             
             <TabsContent value="classification" className="mt-6">
@@ -60,6 +67,10 @@ const Index = () => {
             
             <TabsContent value="keywords" className="mt-6">
               <KeywordExclusionManager />
+            </TabsContent>
+            
+            <TabsContent value="history" className="mt-6">
+              <ProcessingHistory onResultSelect={handleHistoryResultSelect} />
             </TabsContent>
           </Tabs>
         </div>
