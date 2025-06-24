@@ -1,8 +1,8 @@
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, HardDrive, Trash2 } from "lucide-react";
-import { useStorageCleanup } from "@/hooks/useStorageCleanup";
+import { AlertTriangle, Trash2 } from "lucide-react";
+import { storageService } from "@/services/storageService";
 
 interface StorageStatusIndicatorProps {
   storageStatus: 'localStorage' | 'memory' | 'error';
@@ -10,20 +10,18 @@ interface StorageStatusIndicatorProps {
 }
 
 const StorageStatusIndicator = ({ storageStatus, isUsingFallback }: StorageStatusIndicatorProps) => {
-  const { clearAllStorage, getStorageSize } = useStorageCleanup();
-
   if (storageStatus === 'localStorage' && !isUsingFallback) {
-    return null; // Don't show anything when everything is working normally
+    return null;
   }
 
   const handleClearStorage = () => {
     if (confirm('This will clear all stored data except user preferences. Are you sure?')) {
-      clearAllStorage();
-      window.location.reload(); // Reload to reset all state
+      storageService.clear();
+      window.location.reload();
     }
   };
 
-  const currentSize = getStorageSize();
+  const currentSize = storageService.getSize();
   const usagePercent = (currentSize / (4 * 1024 * 1024)) * 100;
 
   return (
@@ -33,13 +31,12 @@ const StorageStatusIndicator = ({ storageStatus, isUsingFallback }: StorageStatu
         <div>
           {isUsingFallback ? (
             <>
-              <strong>Storage Limited:</strong> Using temporary memory storage due to quota constraints. 
+              <strong>Storage Limited:</strong> Using temporary memory storage. 
               Data may be lost on page refresh. ({usagePercent.toFixed(1)}% storage used)
             </>
           ) : (
             <>
-              <strong>Storage Warning:</strong> Browser storage is nearly full ({usagePercent.toFixed(1)}% used). 
-              Some features may not work properly.
+              <strong>Storage Warning:</strong> Browser storage is nearly full ({usagePercent.toFixed(1)}% used).
             </>
           )}
         </div>

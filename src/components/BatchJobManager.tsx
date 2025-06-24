@@ -5,30 +5,19 @@ import { useToast } from "@/components/ui/use-toast";
 import { AlertCircle } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
-import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { StoredBatchJob, isValidBatchJobId } from "@/lib/storage/batchJobStorage";
 import StorageStatusIndicator from "./StorageStatusIndicator";
 import ConfirmationDialog from "./ConfirmationDialog";
 import EnhancedBatchJobCard from "./batch/EnhancedBatchJobCard";
+import { useBatchJobs } from "@/hooks/useBatchJobs";
+import { useJobPolling } from "@/hooks/useJobPolling";
 import { useBatchJobActions } from "@/hooks/useBatchJobActions";
 
 interface BatchJobManagerProps {
-  jobs: StoredBatchJob[];
-  onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
-  onJobDelete: (jobId: string) => void;
-  storageStatus?: 'localStorage' | 'memory' | 'error';
-  isUsingFallback?: boolean;
 }
 
-const BatchJobManager = ({ 
-  jobs, 
-  onJobUpdate, 
-  onJobComplete, 
-  onJobDelete,
-  storageStatus = 'localStorage',
-  isUsingFallback = false
-}: BatchJobManagerProps) => {
+const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -43,67 +32,20 @@ const BatchJobManager = ({
   });
   const { toast } = useToast();
 
-  // Debug logging for job validation
-  console.log(`[BATCH MANAGER] Processing ${jobs.length} total jobs`);
-  jobs.forEach((job, index) => {
-    console.log(`[BATCH MANAGER] Job ${index}:`, {
-      id: job.id,
-      idLength: job.id?.length,
-      isValidId: isValidBatchJobId(job.id),
-      status: job.status,
-      payeeCount: job.payeeNames?.length
-    });
-  });
-
-  // Filter out invalid job IDs
-  const validJobs = jobs.filter(job => {
-    const isValid = isValidBatchJobId(job.id);
-    if (!isValid) {
-      console.log(`[BATCH MANAGER] Filtering out invalid job:`, job.id);
-    }
-    return isValid;
-  });
-
-  console.log(`[BATCH MANAGER] After filtering: ${validJobs.length} valid jobs out of ${jobs.length} total`);
-
-  // Handle auto-download when jobs complete
+  const { batchJobs, isLoading, updateJob, deleteJob, getStorageInfo } = useBatchJobs();
+  
   const handleJobCompleted = async (completedJob: BatchJob) => {
-    console.log(`[BATCH MANAGER] Auto-downloading results for completed job: ${completedJob.id}`);
-    
-    try {
-      // Find the stored job data
-      const storedJob = validJobs.find(j => j.id === completedJob.id);
-      if (!storedJob) {
-        console.error(`[BATCH MANAGER] Could not find stored job data for ${completedJob.id}`);
-        toast({
-          title: "Auto-Download Failed",
-          description: `Could not find job data for ${completedJob.id.slice(-8)}. Try manual download.`,
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Trigger download using the batch job actions
+    const storedJob = batchJobs.find(j => j.id === completedJob.id);
+    if (storedJob) {
       await handleDownloadResults(storedJob);
-      
-    } catch (error) {
-      console.error(`[BATCH MANAGER] Auto-download failed for job ${completedJob.id}:`, error);
-      toast({
-        title: "Auto-Download Failed",
-        description: `Failed to auto-download results for job ${completedJob.id.slice(-8)}. You can try downloading manually.`,
-        variant: "destructive",
-      });
     }
   };
 
-  // Use the polling hook with completion callback
-  const { pollingStates, manualRefresh } = useBatchJobPolling(
-    validJobs, 
-    onJobUpdate,
+  const { pollingStates, manualRefresh } = useJobPolling(
+    updateJob,
     handleJobCompleted
   );
 
-  // Use the batch job actions hook
   const {
     refreshingJobs,
     downloadingJobs,
@@ -111,11 +53,11 @@ const BatchJobManager = ({
     handleDownloadResults,
     handleCancelJob
   } = useBatchJobActions({
-    validJobs,
+    validJobs: batchJobs,
     manualRefresh,
-    onJobUpdate,
+    onJobUpdate: updateJob,
     onJobComplete,
-    onJobDelete,
+    onJobDelete: deleteJob,
     toast
   });
 
@@ -123,40 +65,37 @@ const BatchJobManager = ({
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
-      description: `Are you sure you want to cancel job ${jobId.slice(-8)}? This action cannot be undone and you may be charged for completed requests.`,
+      description: `Are you sure you want to cancel job ${jobId.slice(-8)}?`,
       onConfirm: () => handleCancelJob(jobId),
       variant: 'destructive'
     });
   };
 
   const showDeleteConfirmation = (jobId: string) => {
-    const job = validJobs.find(j => j.id === jobId);
-    const jobStatus = job?.status || 'unknown';
-    
     setConfirmDialog({
       isOpen: true,
       title: 'Remove Job from List',
-      description: `Are you sure you want to remove job ${jobId.slice(-8)} (${jobStatus}) from your list? This will only remove it from your view and local storage, not delete the actual OpenAI batch job.`,
-      onConfirm: () => {
-        onJobDelete(jobId);
-        toast({
-          title: "Job Removed",
-          description: `Job ${jobId.slice(-8)} has been removed from your list.`,
-        });
-      },
+      description: `Remove job ${jobId.slice(-8)} from your list?`,
+      onConfirm: () => deleteJob(jobId),
       variant: 'destructive'
     });
   };
 
-  // Sort jobs by creation date in descending order (most recent first)
-  const sortedJobs = [...validJobs].sort((a, b) => b.created_at - a.created_at);
+  if (isLoading) {
+    return <div className="text-center">Loading batch jobs...</div>;
+  }
 
-  if (jobs.length === 0) {
+  const validJobs = batchJobs.filter(job => isValidBatchJobId(job.id));
+  const invalidJobsCount = batchJobs.length - validJobs.length;
+  const sortedJobs = [...validJobs].sort((a, b) => b.created_at - a.created_at);
+  const storageInfo = getStorageInfo();
+
+  if (batchJobs.length === 0) {
     return (
       <>
         <StorageStatusIndicator 
-          storageStatus={storageStatus} 
-          isUsingFallback={isUsingFallback} 
+          storageStatus={storageInfo.storageStatus} 
+          isUsingFallback={storageInfo.isUsingFallback} 
         />
         <Alert>
           <AlertDescription>
@@ -167,15 +106,12 @@ const BatchJobManager = ({
     );
   }
 
-  // Show warning if some jobs were filtered out
-  const invalidJobsCount = jobs.length - validJobs.length;
-
   return (
     <>
       <div className="space-y-4">
         <StorageStatusIndicator 
-          storageStatus={storageStatus} 
-          isUsingFallback={isUsingFallback} 
+          storageStatus={storageInfo.storageStatus} 
+          isUsingFallback={storageInfo.isUsingFallback} 
         />
         
         <h3 className="text-lg font-medium">Batch Jobs</h3>
@@ -184,34 +120,25 @@ const BatchJobManager = ({
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {invalidJobsCount} invalid job(s) were filtered out. 
-              Check console logs for details about job ID validation.
-              Expected format: batch_[alphanumeric characters, 15+ length]
+              {invalidJobsCount} invalid job(s) were filtered out.
             </AlertDescription>
           </Alert>
         )}
         
-        {sortedJobs.map((job) => {
-          const pollingState = pollingStates[job.id];
-          const isJobRefreshing = refreshingJobs.has(job.id);
-          const isJobDownloading = downloadingJobs.has(job.id);
-          const payeeCount = job.payeeNames?.length || 0;
-          
-          return (
-            <EnhancedBatchJobCard
-              key={job.id}
-              job={job}
-              pollingState={pollingState}
-              payeeCount={payeeCount}
-              isRefreshing={isJobRefreshing}
-              isDownloading={isJobDownloading}
-              onManualRefresh={handleManualRefresh}
-              onDownloadResults={handleDownloadResults}
-              onCancelJob={showCancelConfirmation}
-              onDeleteJob={showDeleteConfirmation}
-            />
-          );
-        })}
+        {sortedJobs.map((job) => (
+          <EnhancedBatchJobCard
+            key={job.id}
+            job={job}
+            pollingState={pollingStates[job.id]}
+            payeeCount={job.payeeNames?.length || 0}
+            isRefreshing={refreshingJobs.has(job.id)}
+            isDownloading={downloadingJobs.has(job.id)}
+            onManualRefresh={handleManualRefresh}
+            onDownloadResults={handleDownloadResults}
+            onCancelJob={showCancelConfirmation}
+            onDeleteJob={showDeleteConfirmation}
+          />
+        ))}
       </div>
 
       <ConfirmationDialog

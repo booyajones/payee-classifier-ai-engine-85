@@ -1,7 +1,5 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { AlertCircle } from "lucide-react";
 import BatchJobManager from "./BatchJobManager";
@@ -13,10 +11,10 @@ import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
 import { enhancedCleanProcessBatch } from "@/lib/classification/enhancedCleanBatchProcessor";
 import { exportResultsFixed } from "@/lib/classification/fixedExporter";
-import { usePersistentBatchJobs } from "@/hooks/usePersistentBatchJobs";
+import { useBatchJobs } from "@/hooks/useBatchJobs";
 import { useProcessing } from "@/contexts/ProcessingContext";
 import { saveProcessingResults } from "@/lib/storage/resultStorage";
-import { useStorageCleanup } from "@/hooks/useStorageCleanup";
+import { storageService } from "@/services/storageService";
 
 interface BatchClassificationFormProps {
   onComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
@@ -32,17 +30,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const { addJob, updateJob, removeJob } = useProcessing();
-  const { safeSetItem, cleanupOldData } = useStorageCleanup();
-
-  const {
-    batchJobs,
-    isLoading: jobsLoading,
-    addJob: addPersistentJob,
-    updateJob: updatePersistentJob,
-    deleteJob,
-    storageStatus,
-    isUsingFallback
-  } = usePersistentBatchJobs();
+  const { addJob: addPersistentJob } = useBatchJobs();
 
   useEffect(() => {
     const checkApiKey = async () => {
@@ -67,7 +55,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         setIsApiKeyValid(false);
         toast({
           title: "API Connection Error",
-          description: "Failed to verify OpenAI API connection. Please check your API key.",
+          description: "Failed to verify OpenAI API connection.",
           variant: "destructive"
         });
       } finally {
@@ -81,10 +69,8 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const handleDirectProcessing = async (originalFileData: any[], selectedColumn: string) => {
     setIsProcessing(true);
     
-    // Create a unique job ID for tracking
     const jobId = `direct-${Date.now()}`;
     
-    // Add job to processing context
     addJob({
       id: jobId,
       type: 'direct',
@@ -107,7 +93,6 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
           useEnhanced: true,
           offlineMode: false
         },
-        // Progress callback
         (current, total, stats) => {
           updateJob(jobId, {
             processedRows: current,
@@ -120,24 +105,18 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         }
       );
       
-      // Mark job as completed
       updateJob(jobId, {
         status: 'completed',
         processedRows: originalFileData.length
       });
       
-      // Try to save results to database, but don't fail if it's not configured
       try {
         const { saveProcessingResults, isSupabaseConfigured } = await import('@/lib/storage/resultStorage');
         if (isSupabaseConfigured()) {
           await saveProcessingResults(result.results, result, jobId, 'direct');
-          console.log('[BATCH FORM] Results saved to database successfully');
-        } else {
-          console.log('[BATCH FORM] Database not configured, skipping save');
         }
       } catch (dbError) {
         console.error('[BATCH FORM] Failed to save results to database:', dbError);
-        // Only show warning if it's not a configuration issue
         if (!dbError?.message?.includes('Database not configured')) {
           toast({
             title: "Warning",
@@ -147,17 +126,13 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         }
       }
       
-      // Remove from active jobs after a short delay
-      setTimeout(() => {
-        removeJob(jobId);
-      }, 5000);
+      setTimeout(() => removeJob(jobId), 5000);
       
       setBatchResults(result.results);
       setProcessingSummary(result);
       onComplete(result.results, result);
       
-      // Cleanup storage after successful processing
-      cleanupOldData();
+      storageService.cleanup();
       
       toast({
         title: "Processing Complete",
@@ -165,15 +140,8 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       });
       
     } catch (error) {
-      // Mark job as failed
-      updateJob(jobId, {
-        status: 'failed'
-      });
-      
-      // Remove from active jobs after a short delay
-      setTimeout(() => {
-        removeJob(jobId);
-      }, 3000);
+      updateJob(jobId, { status: 'failed' });
+      setTimeout(() => removeJob(jobId), 3000);
       
       toast({
         title: "Processing Failed",
@@ -196,9 +164,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     }
     
     await addPersistentJob(batchJob, payeeNames, originalFileData);
-    
-    // Cleanup storage after adding new job
-    cleanupOldData();
+    storageService.cleanup();
     
     toast({
       title: "Batch Job Created",
@@ -211,14 +177,10 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     setProcessingSummary(summary);
     onComplete(results, summary);
     
-    // Try to save batch API results to database
     try {
       const { saveProcessingResults, isSupabaseConfigured } = await import('@/lib/storage/resultStorage');
       if (isSupabaseConfigured()) {
         await saveProcessingResults(results, summary, jobId, 'batch');
-        console.log('[BATCH FORM] Batch API results saved to database successfully');
-      } else {
-        console.log('[BATCH FORM] Database not configured, skipping save');
       }
     } catch (dbError) {
       console.error('[BATCH FORM] Failed to save batch results to database:', dbError);
@@ -231,12 +193,11 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       }
     }
     
-    // Cleanup storage after completion
-    cleanupOldData();
+    storageService.cleanup();
     
     toast({
       title: "Results Downloaded",
-      description: `Successfully downloaded and processed ${results.length} results.`,
+      description: `Successfully downloaded ${results.length} results.`,
     });
   };
 
@@ -255,12 +216,12 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     onApiKeyChange?.();
   };
 
-  if (isCheckingApiKey || jobsLoading) {
+  if (isCheckingApiKey) {
     return (
       <Card>
         <CardContent className="p-6">
           <div className="text-center text-muted-foreground">
-            {isCheckingApiKey ? "Verifying API connection..." : "Loading..."}
+            Verifying API connection...
           </div>
         </CardContent>
       </Card>
@@ -296,16 +257,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         isProcessing={isProcessing}
       />
 
-      {batchJobs.length > 0 && (
-        <BatchJobManager
-          jobs={batchJobs}
-          onJobUpdate={updatePersistentJob}
-          onJobComplete={handleJobComplete}
-          onJobDelete={deleteJob}
-          storageStatus={storageStatus}
-          isUsingFallback={isUsingFallback}
-        />
-      )}
+      <BatchJobManager onJobComplete={handleJobComplete} />
 
       <BatchResultsDisplay
         batchResults={batchResults}
