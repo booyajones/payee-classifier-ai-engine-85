@@ -5,7 +5,7 @@ import { AlertTriangle, Trash2 } from "lucide-react";
 import { storageService } from "@/services/storageService";
 
 interface StorageStatusIndicatorProps {
-  storageStatus: 'localStorage' | 'memory' | 'error';
+  storageStatus: 'localStorage' | 'sessionStorage' | 'memory' | 'error';
   isUsingFallback: boolean;
 }
 
@@ -24,21 +24,48 @@ const StorageStatusIndicator = ({ storageStatus, isUsingFallback }: StorageStatu
   const currentSize = storageService.getSize();
   const usagePercent = (currentSize / (4 * 1024 * 1024)) * 100;
 
+  const getStorageMessage = () => {
+    if (storageStatus === 'sessionStorage') {
+      return (
+        <>
+          <strong>Using Session Storage:</strong> Data will persist during this browser session but 
+          may be lost when you close the tab. ({usagePercent.toFixed(1)}% storage used)
+        </>
+      );
+    }
+    
+    if (storageStatus === 'memory') {
+      return (
+        <>
+          <strong>Storage Limited:</strong> Using temporary memory storage. 
+          Data may be lost on page refresh. ({usagePercent.toFixed(1)}% storage used)
+        </>
+      );
+    }
+
+    if (storageStatus === 'error') {
+      return (
+        <>
+          <strong>Storage Error:</strong> Unable to access browser storage. 
+          Data will be lost on page refresh.
+        </>
+      );
+    }
+
+    // Fallback for localStorage with high usage
+    return (
+      <>
+        <strong>Storage Warning:</strong> Browser storage is nearly full ({usagePercent.toFixed(1)}% used).
+      </>
+    );
+  };
+
   return (
     <Alert className="mb-4">
       <AlertTriangle className="h-4 w-4" />
       <AlertDescription className="flex items-center justify-between">
         <div>
-          {isUsingFallback ? (
-            <>
-              <strong>Storage Limited:</strong> Using temporary memory storage. 
-              Data may be lost on page refresh. ({usagePercent.toFixed(1)}% storage used)
-            </>
-          ) : (
-            <>
-              <strong>Storage Warning:</strong> Browser storage is nearly full ({usagePercent.toFixed(1)}% used).
-            </>
-          )}
+          {getStorageMessage()}
         </div>
         <Button
           variant="outline"
