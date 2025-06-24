@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { getBatchJobResults, cancelBatchJob } from "@/lib/openai/trueBatchAPI";
+import { getBatchJobResults, cancelBatchJob, checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { createPayeeClassification } from "@/lib/utils";
 import { handleError, showErrorToast, showRetryableErrorToast } from "@/lib/errorHandler";
@@ -84,7 +84,17 @@ export const useBatchJobActions = ({
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     
     try {
-      console.log(`[BATCH MANAGER] Downloading results for job ${job.id} with GUARANTEED alignment`);
+      console.log(`[BATCH MANAGER] Starting download for job ${job.id}`);
+      
+      // First, get the latest job status to ensure it's actually completed
+      const latestJob = await checkBatchJobStatus(job.id);
+      console.log(`[BATCH MANAGER] Latest job status: ${latestJob.status}`);
+      
+      if (latestJob.status !== 'completed') {
+        throw new Error(`Job is not completed. Current status: ${latestJob.status}`);
+      }
+      
+      console.log(`[BATCH MANAGER] Downloading results for completed job ${job.id} with GUARANTEED alignment`);
       const payeeNames = job.payeeNames || [];
       const originalFileData = job.originalFileData || [];
       
@@ -106,8 +116,8 @@ export const useBatchJobActions = ({
       // Create sequential row indexes to guarantee 1:1 correspondence
       const originalRowIndexes = Array.from({ length: payeeNames.length }, (_, i) => i);
 
-      // Get raw results from OpenAI with guaranteed index alignment
-      const rawResults = await downloadResultsWithRetry(job, payeeNames, originalRowIndexes);
+      // Get raw results from OpenAI with guaranteed index alignment using the latest job data
+      const rawResults = await downloadResultsWithRetry(latestJob, payeeNames, originalRowIndexes);
       
       console.log(`[BATCH MANAGER] Processing ${rawResults.length} results with PERFECT alignment`);
       
