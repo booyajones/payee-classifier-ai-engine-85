@@ -39,7 +39,9 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     isLoading: jobsLoading,
     addJob: addPersistentJob,
     updateJob: updatePersistentJob,
-    deleteJob
+    deleteJob,
+    storageStatus,
+    isUsingFallback
   } = usePersistentBatchJobs();
 
   useEffect(() => {
@@ -300,6 +302,8 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
           onJobUpdate={updatePersistentJob}
           onJobComplete={handleJobComplete}
           onJobDelete={deleteJob}
+          storageStatus={storageStatus}
+          isUsingFallback={isUsingFallback}
         />
       )}
 

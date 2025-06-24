@@ -7,7 +7,7 @@ import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { StoredBatchJob, isValidBatchJobId } from "@/lib/storage/batchJobStorage";
-import { useStorageCleanup } from "@/hooks/useStorageCleanup";
+import StorageStatusIndicator from "./StorageStatusIndicator";
 import ConfirmationDialog from "./ConfirmationDialog";
 import EnhancedBatchJobCard from "./batch/EnhancedBatchJobCard";
 import { useBatchJobActions } from "@/hooks/useBatchJobActions";
@@ -17,13 +17,17 @@ interface BatchJobManagerProps {
   onJobUpdate: (job: BatchJob) => void;
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
   onJobDelete: (jobId: string) => void;
+  storageStatus?: 'localStorage' | 'memory' | 'error';
+  isUsingFallback?: boolean;
 }
 
 const BatchJobManager = ({ 
   jobs, 
   onJobUpdate, 
   onJobComplete, 
-  onJobDelete 
+  onJobDelete,
+  storageStatus = 'localStorage',
+  isUsingFallback = false
 }: BatchJobManagerProps) => {
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -38,7 +42,6 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
   const { toast } = useToast();
-  const { cleanupOldData } = useStorageCleanup();
 
   // Debug logging for job validation
   console.log(`[BATCH MANAGER] Processing ${jobs.length} total jobs`);
@@ -117,7 +120,6 @@ const BatchJobManager = ({
   });
 
   const showCancelConfirmation = (jobId: string) => {
-    const job = validJobs.find(j => j.id === jobId);
     setConfirmDialog({
       isOpen: true,
       title: 'Cancel Batch Job',
@@ -137,7 +139,6 @@ const BatchJobManager = ({
       description: `Are you sure you want to remove job ${jobId.slice(-8)} (${jobStatus}) from your list? This will only remove it from your view and local storage, not delete the actual OpenAI batch job.`,
       onConfirm: () => {
         onJobDelete(jobId);
-        cleanupOldData(); // Cleanup storage after deletion
         toast({
           title: "Job Removed",
           description: `Job ${jobId.slice(-8)} has been removed from your list.`,
@@ -152,11 +153,17 @@ const BatchJobManager = ({
 
   if (jobs.length === 0) {
     return (
-      <Alert>
-        <AlertDescription>
-          No batch jobs found. Submit a batch for processing to see jobs here.
-        </AlertDescription>
-      </Alert>
+      <>
+        <StorageStatusIndicator 
+          storageStatus={storageStatus} 
+          isUsingFallback={isUsingFallback} 
+        />
+        <Alert>
+          <AlertDescription>
+            No batch jobs found. Submit a batch for processing to see jobs here.
+          </AlertDescription>
+        </Alert>
+      </>
     );
   }
 
@@ -166,6 +173,11 @@ const BatchJobManager = ({
   return (
     <>
       <div className="space-y-4">
+        <StorageStatusIndicator 
+          storageStatus={storageStatus} 
+          isUsingFallback={isUsingFallback} 
+        />
+        
         <h3 className="text-lg font-medium">Batch Jobs</h3>
         
         {invalidJobsCount > 0 && (

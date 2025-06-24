@@ -1,21 +1,20 @@
-
 import { useState, useEffect } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { StoredBatchJob, isValidBatchJobId } from '@/lib/storage/batchJobStorage';
-import { useStorageCleanup } from './useStorageCleanup';
+import { useFallbackStorage } from './useFallbackStorage';
 
 const STORAGE_KEY = 'batchJobs';
 
 export const usePersistentBatchJobs = () => {
   const [batchJobs, setBatchJobs] = useState<StoredBatchJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { safeSetItem } = useStorageCleanup();
+  const { setItem, getItem, removeItem, isUsingFallback, storageStatus } = useFallbackStorage();
 
-  // Load jobs from localStorage on mount
+  // Load jobs from storage on mount
   useEffect(() => {
     const loadJobs = () => {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = getItem(STORAGE_KEY);
         if (stored) {
           const jobs: StoredBatchJob[] = JSON.parse(stored);
           
@@ -33,11 +32,11 @@ export const usePersistentBatchJobs = () => {
           
           // Save back the cleaned list if we filtered anything
           if (validJobs.length !== jobs.length) {
-            safeSetItem(STORAGE_KEY, JSON.stringify(validJobs));
+            saveJobs(validJobs);
           }
         }
       } catch (error) {
-        console.error('[PERSISTENT JOBS] Error loading jobs from localStorage:', error);
+        console.error('[PERSISTENT JOBS] Error loading jobs from storage:', error);
         setBatchJobs([]);
       } finally {
         setIsLoading(false);
@@ -45,17 +44,19 @@ export const usePersistentBatchJobs = () => {
     };
 
     loadJobs();
-  }, [safeSetItem]);
+  }, [getItem]);
 
-  // Save jobs to localStorage whenever they change
-  const saveJobs = (jobs: StoredBatchJob[]) => {
+  // Save jobs to storage with fallback
+  const saveJobs = (jobs: StoredBatchJob[]): boolean => {
     try {
-      const success = safeSetItem(STORAGE_KEY, JSON.stringify(jobs));
+      const success = setItem(STORAGE_KEY, JSON.stringify(jobs));
       if (!success) {
-        console.error('[PERSISTENT JOBS] Failed to save jobs to localStorage');
+        console.error('[PERSISTENT JOBS] Failed to save jobs to storage');
       }
+      return success;
     } catch (error) {
-      console.error('[PERSISTENT JOBS] Error saving jobs to localStorage:', error);
+      console.error('[PERSISTENT JOBS] Error saving jobs to storage:', error);
+      return false;
     }
   };
 
@@ -69,20 +70,32 @@ export const usePersistentBatchJobs = () => {
       throw new Error(`Invalid batch job ID format: ${batchJob.id}`);
     }
 
+    // Don't store originalFileData if storage is constrained
+    const shouldStoreFileData = !isUsingFallback && originalFileData.length < 1000;
+    
     const storedJob: StoredBatchJob = {
       ...batchJob,
       payeeNames,
-      originalFileData,
+      originalFileData: shouldStoreFileData ? originalFileData : [], // Store empty array if too large
       created_at: Date.now()
     };
     
     setBatchJobs(prev => {
       const newJobs = [storedJob, ...prev];
-      saveJobs(newJobs);
+      const saved = saveJobs(newJobs);
+      
+      // If save failed, keep only essential jobs in memory
+      if (!saved && isUsingFallback) {
+        const essentialJobs = newJobs.filter(job => 
+          ['in_progress', 'validating', 'finalizing'].includes(job.status)
+        ).slice(0, 5); // Keep only 5 most important jobs
+        return essentialJobs;
+      }
+      
       return newJobs;
     });
     
-    console.log(`[PERSISTENT JOBS] Added job: ${batchJob.id}`);
+    console.log(`[PERSISTENT JOBS] Added job: ${batchJob.id} (storage: ${storageStatus})`);
   };
 
   const updateJob = (updatedJob: BatchJob): void => {
@@ -97,11 +110,14 @@ export const usePersistentBatchJobs = () => {
           ? { ...job, ...updatedJob }
           : job
       );
-      saveJobs(newJobs);
+      
+      const saved = saveJobs(newJobs);
+      
+      // Critical: Always update the UI state even if storage fails
+      console.log(`[PERSISTENT JOBS] Updated job: ${updatedJob.id} (status: ${updatedJob.status}, storage: ${saved ? 'success' : 'failed'})`);
+      
       return newJobs;
     });
-    
-    console.log(`[PERSISTENT JOBS] Updated job: ${updatedJob.id} (status: ${updatedJob.status})`);
   };
 
   const deleteJob = (jobId: string): void => {
@@ -124,7 +140,7 @@ export const usePersistentBatchJobs = () => {
 
   const clearAllJobs = (): void => {
     setBatchJobs([]);
-    localStorage.removeItem(STORAGE_KEY);
+    removeItem(STORAGE_KEY);
     console.log('[PERSISTENT JOBS] Cleared all jobs');
   };
 
@@ -136,6 +152,8 @@ export const usePersistentBatchJobs = () => {
     deleteJob,
     getJobById,
     getJobsByStatus,
-    clearAllJobs
+    clearAllJobs,
+    storageStatus,
+    isUsingFallback
   };
 };
