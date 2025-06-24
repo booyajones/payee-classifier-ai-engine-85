@@ -7,7 +7,7 @@ const STORAGE_KEY = 'lovable_batch_jobs';
 export interface StoredBatchJob extends BatchJob {
   payeeNames: string[];
   originalFileData: any[];
-  createdAt: number;
+  created_at: number; // Changed from createdAt to created_at
   isMockJob?: boolean;
 }
 
@@ -52,7 +52,7 @@ export function addBatchJob(job: BatchJob, payeeNames: string[], originalFileDat
     ...job,
     payeeNames,
     originalFileData,
-    createdAt: Date.now(),
+    created_at: Date.now(), // Changed from createdAt to created_at
     isMockJob
   };
   
