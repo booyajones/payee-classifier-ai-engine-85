@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
@@ -6,6 +7,7 @@ import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { useBatchJobPolling } from "@/hooks/useBatchJobPolling";
 import { StoredBatchJob, isValidBatchJobId } from "@/lib/storage/batchJobStorage";
+import { useStorageCleanup } from "@/hooks/useStorageCleanup";
 import ConfirmationDialog from "./ConfirmationDialog";
 import EnhancedBatchJobCard from "./batch/EnhancedBatchJobCard";
 import { useBatchJobActions } from "@/hooks/useBatchJobActions";
@@ -36,6 +38,7 @@ const BatchJobManager = ({
     onConfirm: () => {}
   });
   const { toast } = useToast();
+  const { cleanupOldData } = useStorageCleanup();
 
   // Debug logging for job validation
   console.log(`[BATCH MANAGER] Processing ${jobs.length} total jobs`);
@@ -60,8 +63,42 @@ const BatchJobManager = ({
 
   console.log(`[BATCH MANAGER] After filtering: ${validJobs.length} valid jobs out of ${jobs.length} total`);
 
-  // Use the polling hook for all valid jobs
-  const { pollingStates, manualRefresh } = useBatchJobPolling(validJobs, onJobUpdate);
+  // Handle auto-download when jobs complete
+  const handleJobCompleted = async (completedJob: BatchJob) => {
+    console.log(`[BATCH MANAGER] Auto-downloading results for completed job: ${completedJob.id}`);
+    
+    try {
+      // Find the stored job data
+      const storedJob = validJobs.find(j => j.id === completedJob.id);
+      if (!storedJob) {
+        console.error(`[BATCH MANAGER] Could not find stored job data for ${completedJob.id}`);
+        toast({
+          title: "Auto-Download Failed",
+          description: `Could not find job data for ${completedJob.id.slice(-8)}. Try manual download.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Trigger download using the batch job actions
+      await handleDownloadResults(storedJob);
+      
+    } catch (error) {
+      console.error(`[BATCH MANAGER] Auto-download failed for job ${completedJob.id}:`, error);
+      toast({
+        title: "Auto-Download Failed",
+        description: `Failed to auto-download results for job ${completedJob.id.slice(-8)}. You can try downloading manually.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Use the polling hook with completion callback
+  const { pollingStates, manualRefresh } = useBatchJobPolling(
+    validJobs, 
+    onJobUpdate,
+    handleJobCompleted
+  );
 
   // Use the batch job actions hook
   const {
@@ -100,6 +137,7 @@ const BatchJobManager = ({
       description: `Are you sure you want to remove job ${jobId.slice(-8)} (${jobStatus}) from your list? This will only remove it from your view and local storage, not delete the actual OpenAI batch job.`,
       onConfirm: () => {
         onJobDelete(jobId);
+        cleanupOldData(); // Cleanup storage after deletion
         toast({
           title: "Job Removed",
           description: `Job ${jobId.slice(-8)} has been removed from your list.`,

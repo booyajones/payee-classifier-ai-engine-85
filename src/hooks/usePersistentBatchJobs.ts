@@ -1,164 +1,141 @@
 
 import { useState, useEffect } from 'react';
-import { useToast } from '@/components/ui/use-toast';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
-import { StoredBatchJob } from '@/lib/storage/batchJobStorage';
-import {
-  isSupabaseConfigured,
-  saveJobToSupabase,
-  archiveJobInSupabase,
-  updateJobInSupabase,
-  syncBatchJobs
-} from '@/lib/storage/supabaseBatchStorage';
-import { logger } from '@/lib/logger';
+import { StoredBatchJob, isValidBatchJobId } from '@/lib/storage/batchJobStorage';
+import { useStorageCleanup } from './useStorageCleanup';
+
+const STORAGE_KEY = 'batchJobs';
 
 export const usePersistentBatchJobs = () => {
   const [batchJobs, setBatchJobs] = useState<StoredBatchJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const { toast } = useToast();
+  const { safeSetItem } = useStorageCleanup();
 
-  // Load jobs on mount with sync
+  // Load jobs from localStorage on mount
   useEffect(() => {
-    loadJobs();
-  }, []);
-
-  const loadJobs = async () => {
-    try {
-      setIsLoading(true);
-      const jobs = await syncBatchJobs();
-      setBatchJobs(jobs);
-      
-      if (isSupabaseConfigured()) {
-        logger.info('[PERSISTENT JOBS] Loaded jobs with Supabase sync');
-      } else {
-        logger.info('[PERSISTENT JOBS] Loaded jobs from localStorage only');
+    const loadJobs = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const jobs: StoredBatchJob[] = JSON.parse(stored);
+          
+          // Filter out invalid jobs during load
+          const validJobs = jobs.filter(job => {
+            const isValid = isValidBatchJobId(job.id);
+            if (!isValid) {
+              console.warn(`[PERSISTENT JOBS] Removing invalid job on load: ${job.id}`);
+            }
+            return isValid;
+          });
+          
+          console.log(`[PERSISTENT JOBS] Loaded ${validJobs.length} valid jobs (${jobs.length - validJobs.length} invalid filtered)`);
+          setBatchJobs(validJobs);
+          
+          // Save back the cleaned list if we filtered anything
+          if (validJobs.length !== jobs.length) {
+            safeSetItem(STORAGE_KEY, JSON.stringify(validJobs));
+          }
+        }
+      } catch (error) {
+        console.error('[PERSISTENT JOBS] Error loading jobs from localStorage:', error);
+        setBatchJobs([]);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      logger.error('[PERSISTENT JOBS] Failed to load jobs:', error);
-      toast({
-        title: "Storage Error",
-        description: "Failed to load batch jobs. Using local storage fallback.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const addJob = async (job: BatchJob, payeeNames: string[], originalFileData: any[]) => {
-    const storedJob: StoredBatchJob = {
-      ...job,
-      payeeNames,
-      originalFileData,
-      createdAt: Date.now(),
-      isMockJob: false
     };
 
+    loadJobs();
+  }, [safeSetItem]);
+
+  // Save jobs to localStorage whenever they change
+  const saveJobs = (jobs: StoredBatchJob[]) => {
     try {
-      // Save to localStorage immediately
-      const { addBatchJob } = await import('@/lib/storage/batchJobStorage');
-      addBatchJob(job, payeeNames, originalFileData, false);
-
-      // Save to Supabase in background
-      if (isSupabaseConfigured()) {
-        await saveJobToSupabase(storedJob);
+      const success = safeSetItem(STORAGE_KEY, JSON.stringify(jobs));
+      if (!success) {
+        console.error('[PERSISTENT JOBS] Failed to save jobs to localStorage');
       }
-
-      // Update local state
-      setBatchJobs(prev => [storedJob, ...prev]);
-
-      logger.info(`[PERSISTENT JOBS] Added job ${job.id} with persistent storage`);
     } catch (error) {
-      logger.error(`[PERSISTENT JOBS] Failed to add job ${job.id}:`, error);
-      toast({
-        title: "Storage Warning",
-        description: "Job saved locally but may not sync across devices.",
-        variant: "destructive"
-      });
+      console.error('[PERSISTENT JOBS] Error saving jobs to localStorage:', error);
     }
   };
 
-  const updateJob = async (updatedJob: BatchJob) => {
-    try {
-      // Update localStorage
-      const { updateBatchJob } = await import('@/lib/storage/batchJobStorage');
-      updateBatchJob(updatedJob);
-
-      // Update Supabase in background
-      if (isSupabaseConfigured()) {
-        await updateJobInSupabase(updatedJob);
-      }
-
-      // Update local state
-      setBatchJobs(prev => prev.map(job => 
-        job.id === updatedJob.id ? { ...job, ...updatedJob } : job
-      ));
-
-      logger.info(`[PERSISTENT JOBS] Updated job ${updatedJob.id}`);
-    } catch (error) {
-      logger.error(`[PERSISTENT JOBS] Failed to update job ${updatedJob.id}:`, error);
+  const addJob = async (
+    batchJob: BatchJob, 
+    payeeNames: string[], 
+    originalFileData: any[]
+  ): Promise<void> => {
+    if (!isValidBatchJobId(batchJob.id)) {
+      console.error(`[PERSISTENT JOBS] Cannot add invalid job ID: ${batchJob.id}`);
+      throw new Error(`Invalid batch job ID format: ${batchJob.id}`);
     }
-  };
 
-  const deleteJob = async (jobId: string) => {
-    try {
-      // Remove from localStorage
-      const { removeBatchJob } = await import('@/lib/storage/batchJobStorage');
-      removeBatchJob(jobId);
-
-      // Archive in Supabase (soft delete)
-      if (isSupabaseConfigured()) {
-        await archiveJobInSupabase(jobId);
-      }
-
-      // Update local state
-      setBatchJobs(prev => prev.filter(job => job.id !== jobId));
-
-      logger.info(`[PERSISTENT JOBS] Deleted job ${jobId}`);
-    } catch (error) {
-      logger.error(`[PERSISTENT JOBS] Failed to delete job ${jobId}:`, error);
-      toast({
-        title: "Delete Warning",
-        description: "Job removed locally but may still exist in cloud storage.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const syncJobs = async () => {
-    if (isSyncing) return;
+    const storedJob: StoredBatchJob = {
+      ...batchJob,
+      payeeNames,
+      originalFileData,
+      created_at: Date.now()
+    };
     
-    try {
-      setIsSyncing(true);
-      const jobs = await syncBatchJobs();
-      setBatchJobs(jobs);
-      
-      toast({
-        title: "Sync Complete",
-        description: `Synchronized ${jobs.length} batch jobs.`
-      });
-    } catch (error) {
-      logger.error('[PERSISTENT JOBS] Manual sync failed:', error);
-      toast({
-        title: "Sync Failed",
-        description: "Failed to sync jobs. Check your connection.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSyncing(false);
+    setBatchJobs(prev => {
+      const newJobs = [storedJob, ...prev];
+      saveJobs(newJobs);
+      return newJobs;
+    });
+    
+    console.log(`[PERSISTENT JOBS] Added job: ${batchJob.id}`);
+  };
+
+  const updateJob = (updatedJob: BatchJob): void => {
+    if (!isValidBatchJobId(updatedJob.id)) {
+      console.error(`[PERSISTENT JOBS] Cannot update invalid job ID: ${updatedJob.id}`);
+      return;
     }
+
+    setBatchJobs(prev => {
+      const newJobs = prev.map(job => 
+        job.id === updatedJob.id 
+          ? { ...job, ...updatedJob }
+          : job
+      );
+      saveJobs(newJobs);
+      return newJobs;
+    });
+    
+    console.log(`[PERSISTENT JOBS] Updated job: ${updatedJob.id} (status: ${updatedJob.status})`);
+  };
+
+  const deleteJob = (jobId: string): void => {
+    setBatchJobs(prev => {
+      const newJobs = prev.filter(job => job.id !== jobId);
+      saveJobs(newJobs);
+      return newJobs;
+    });
+    
+    console.log(`[PERSISTENT JOBS] Deleted job: ${jobId}`);
+  };
+
+  const getJobById = (jobId: string): StoredBatchJob | undefined => {
+    return batchJobs.find(job => job.id === jobId);
+  };
+
+  const getJobsByStatus = (status: string): StoredBatchJob[] => {
+    return batchJobs.filter(job => job.status === status);
+  };
+
+  const clearAllJobs = (): void => {
+    setBatchJobs([]);
+    localStorage.removeItem(STORAGE_KEY);
+    console.log('[PERSISTENT JOBS] Cleared all jobs');
   };
 
   return {
     batchJobs,
     isLoading,
-    isSyncing,
-    isSupabaseConfigured: isSupabaseConfigured(),
     addJob,
     updateJob,
     deleteJob,
-    syncJobs,
-    refreshJobs: loadJobs
+    getJobById,
+    getJobsByStatus,
+    clearAllJobs
   };
 };

@@ -14,7 +14,8 @@ interface PollingState {
 
 export const useBatchJobPolling = (
   jobs: BatchJob[],
-  onJobUpdate: (job: BatchJob) => void
+  onJobUpdate: (job: BatchJob) => void,
+  onJobCompleted?: (job: BatchJob) => void
 ) => {
   const [pollingStates, setPollingStates] = useState<Record<string, PollingState>>({});
   const intervalRefs = useRef<Record<string, NodeJS.Timeout>>({});
@@ -53,6 +54,8 @@ export const useBatchJobPolling = (
         console.log(`[POLLING] Auto-poll #${currentPollCount + 1} for job ${jobId}`);
         
         const updatedJob = await checkBatchJobStatus(jobId);
+        const previousJob = jobs.find(j => j.id === jobId);
+        
         onJobUpdate(updatedJob);
 
         setPollingStates(prev => ({
@@ -66,10 +69,11 @@ export const useBatchJobPolling = (
           }
         }));
 
-        // Check if job is complete
-        if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status)) {
-          console.log(`[POLLING] Job ${jobId} completed with status: ${updatedJob.status}`);
+        // Check if job just completed (status changed to completed)
+        if (updatedJob.status === 'completed' && previousJob?.status !== 'completed') {
+          console.log(`[POLLING] Job ${jobId} just completed - triggering auto-download`);
           
+          // Stop polling
           if (intervalRefs.current[jobId]) {
             clearInterval(intervalRefs.current[jobId]);
             delete intervalRefs.current[jobId];
@@ -80,12 +84,31 @@ export const useBatchJobPolling = (
             [jobId]: { ...prev[jobId], isPolling: false }
           }));
 
-          if (updatedJob.status === 'completed') {
-            toast({
-              title: "Batch Job Completed",
-              description: `Job ${jobId.slice(-8)} has finished processing.`,
-            });
+          // Trigger completion callback for auto-download
+          if (onJobCompleted) {
+            onJobCompleted(updatedJob);
           }
+
+          toast({
+            title: "Batch Job Completed",
+            description: `Job ${jobId.slice(-8)} finished processing. Downloading results...`,
+          });
+          return;
+        }
+
+        // Check if job is complete but was already completed
+        if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status)) {
+          console.log(`[POLLING] Job ${jobId} already completed with status: ${updatedJob.status}`);
+          
+          if (intervalRefs.current[jobId]) {
+            clearInterval(intervalRefs.current[jobId]);
+            delete intervalRefs.current[jobId];
+          }
+          
+          setPollingStates(prev => ({
+            ...prev,
+            [jobId]: { ...prev[jobId], isPolling: false }
+          }));
           return;
         }
 
@@ -149,7 +172,9 @@ export const useBatchJobPolling = (
   const manualRefresh = async (jobId: string) => {
     try {
       console.log(`[POLLING] Manual refresh for job ${jobId}`);
+      const previousJob = jobs.find(j => j.id === jobId);
       const updatedJob = await checkBatchJobStatus(jobId);
+      
       onJobUpdate(updatedJob);
       
       setPollingStates(prev => ({
@@ -162,15 +187,27 @@ export const useBatchJobPolling = (
         }
       }));
       
-      // Start 1-minute auto-polling after manual refresh
-      if (!pollingStates[jobId]?.isPolling && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status)) {
-        startPolling(jobId);
+      // Check if job just completed during manual refresh
+      if (updatedJob.status === 'completed' && previousJob?.status !== 'completed') {
+        console.log(`[POLLING] Job ${jobId} completed during manual refresh - triggering auto-download`);
+        if (onJobCompleted) {
+          onJobCompleted(updatedJob);
+        }
+        toast({
+          title: "Job Completed",
+          description: `Job ${jobId.slice(-8)} completed. Downloading results...`,
+        });
+      } else {
+        // Start 1-minute auto-polling after manual refresh if job is still in progress
+        if (!pollingStates[jobId]?.isPolling && ['validating', 'in_progress', 'finalizing'].includes(updatedJob.status)) {
+          startPolling(jobId);
+        }
+        
+        toast({
+          title: "Status Updated",
+          description: `Job ${jobId.slice(-8)} status refreshed. Auto-checking every minute...`,
+        });
       }
-      
-      toast({
-        title: "Status Updated",
-        description: `Job ${jobId.slice(-8)} status refreshed. Auto-checking every minute...`,
-      });
       
       return updatedJob;
     } catch (error) {
@@ -206,7 +243,6 @@ export const useBatchJobPolling = (
     }));
   };
 
-  // NO AUTO-START - only manual refresh triggers polling
   // Cleanup on unmount
   useEffect(() => {
     return cleanupPolling;

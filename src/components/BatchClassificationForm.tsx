@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,6 +16,7 @@ import { exportResultsFixed } from "@/lib/classification/fixedExporter";
 import { usePersistentBatchJobs } from "@/hooks/usePersistentBatchJobs";
 import { useProcessing } from "@/contexts/ProcessingContext";
 import { saveProcessingResults } from "@/lib/storage/resultStorage";
+import { useStorageCleanup } from "@/hooks/useStorageCleanup";
 
 interface BatchClassificationFormProps {
   onComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
@@ -30,6 +32,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const { addJob, updateJob, removeJob } = useProcessing();
+  const { safeSetItem, cleanupOldData } = useStorageCleanup();
 
   const {
     batchJobs,
@@ -151,6 +154,9 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       setProcessingSummary(result);
       onComplete(result.results, result);
       
+      // Cleanup storage after successful processing
+      cleanupOldData();
+      
       toast({
         title: "Processing Complete",
         description: `Successfully processed ${result.results.length} payees.`,
@@ -189,6 +195,9 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     
     await addPersistentJob(batchJob, payeeNames, originalFileData);
     
+    // Cleanup storage after adding new job
+    cleanupOldData();
+    
     toast({
       title: "Batch Job Created",
       description: `Created batch job with ${payeeNames.length} payees.`,
@@ -219,6 +228,14 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         });
       }
     }
+    
+    // Cleanup storage after completion
+    cleanupOldData();
+    
+    toast({
+      title: "Results Downloaded",
+      description: `Successfully downloaded and processed ${results.length} results.`,
+    });
   };
 
   const handleReset = () => {
