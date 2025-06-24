@@ -15,6 +15,7 @@ import { useBatchJobs } from "@/hooks/useBatchJobs";
 import { useProcessing } from "@/contexts/ProcessingContext";
 import { saveProcessingResults } from "@/lib/storage/resultStorage";
 import { storageService } from "@/services/storageService";
+import { logger } from "@/lib/logger";
 
 interface BatchClassificationFormProps {
   onComplete: (results: PayeeClassification[], summary: BatchProcessingResult) => void;
@@ -153,26 +154,45 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     }
   };
 
-  const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => {
+  const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[] = []) => {
+    logger.info(`[BATCH FORM] Handling batch job creation: ${batchJob.id}`);
+    
     if (!isApiKeyValid) {
+      const error = "Please set a valid OpenAI API key before creating batch jobs.";
+      logger.error(`[BATCH FORM] ${error}`);
       toast({
         title: "API Key Required",
-        description: "Please set a valid OpenAI API key before creating batch jobs.",
+        description: error,
         variant: "destructive"
       });
       return;
     }
     
-    await addPersistentJob(batchJob, payeeNames, originalFileData);
-    storageService.cleanup();
-    
-    toast({
-      title: "Batch Job Created",
-      description: `Created batch job with ${payeeNames.length} payees.`,
-    });
+    try {
+      logger.info(`[BATCH FORM] Adding job to persistent storage...`);
+      await addPersistentJob(batchJob, payeeNames, originalFileData);
+      logger.info(`[BATCH FORM] Job added successfully, running storage cleanup`);
+      
+      storageService.cleanup();
+      
+      toast({
+        title: "Batch Job Created Successfully",
+        description: `Created batch job ${batchJob.id.slice(-8)} with ${payeeNames.length} payees. Monitor progress below.`,
+      });
+      
+      logger.info(`[BATCH FORM] Batch job creation completed successfully`);
+    } catch (error) {
+      logger.error('[BATCH FORM] Error adding batch job:', error);
+      toast({
+        title: "Failed to Save Batch Job",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleJobComplete = async (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
+    logger.info(`[BATCH FORM] Job completed: ${jobId}, results: ${results.length}`);
     setBatchResults(results);
     setProcessingSummary(summary);
     onComplete(results, summary);
@@ -183,7 +203,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         await saveProcessingResults(results, summary, jobId, 'batch');
       }
     } catch (dbError) {
-      console.error('[BATCH FORM] Failed to save batch results to database:', dbError);
+      logger.error('[BATCH FORM] Failed to save batch results to database:', dbError);
       if (!dbError?.message?.includes('Database not configured')) {
         toast({
           title: "Warning",

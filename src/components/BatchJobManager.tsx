@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { StoredBatchJob, isValidBatchJobId } from "@/lib/storage/batchJobStorage";
@@ -12,6 +13,7 @@ import EnhancedBatchJobCard from "./batch/EnhancedBatchJobCard";
 import { useBatchJobs } from "@/hooks/useBatchJobs";
 import { useJobPolling } from "@/hooks/useJobPolling";
 import { useBatchJobActions } from "@/hooks/useBatchJobActions";
+import { logger } from "@/lib/logger";
 
 interface BatchJobManagerProps {
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
@@ -32,9 +34,10 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
   });
   const { toast } = useToast();
 
-  const { batchJobs, isLoading, updateJob, deleteJob, getStorageInfo } = useBatchJobs();
+  const { batchJobs, isLoading, error, updateJob, deleteJob, getStorageInfo, refreshJobs } = useBatchJobs();
   
   const handleJobCompleted = async (completedJob: BatchJob) => {
+    logger.info(`[BATCH JOB MANAGER] Job completed: ${completedJob.id}`);
     const storedJob = batchJobs.find(j => j.id === completedJob.id);
     if (storedJob) {
       await handleDownloadResults(storedJob);
@@ -81,14 +84,45 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
     });
   };
 
+  const handleRefreshJobs = async () => {
+    logger.info('[BATCH JOB MANAGER] Manual refresh triggered');
+    await refreshJobs();
+    toast({
+      title: "Jobs Refreshed",
+      description: "Batch jobs list has been refreshed.",
+    });
+  };
+
   if (isLoading) {
     return <div className="text-center">Loading batch jobs...</div>;
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Error loading batch jobs: {error}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshJobs}
+            className="ml-2"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   const validJobs = batchJobs.filter(job => isValidBatchJobId(job.id));
   const invalidJobsCount = batchJobs.length - validJobs.length;
   const sortedJobs = [...validJobs].sort((a, b) => b.created_at - a.created_at);
   const storageInfo = getStorageInfo();
+
+  logger.info(`[BATCH JOB MANAGER] Rendering ${sortedJobs.length} valid jobs (${invalidJobsCount} invalid filtered)`);
 
   if (batchJobs.length === 0) {
     return (
@@ -114,7 +148,17 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
           isUsingFallback={storageInfo.isUsingFallback} 
         />
         
-        <h3 className="text-lg font-medium">Batch Jobs</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">Batch Jobs</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshJobs}
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Refresh
+          </Button>
+        </div>
         
         {invalidJobsCount > 0 && (
           <Alert>

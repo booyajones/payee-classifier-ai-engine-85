@@ -7,6 +7,7 @@ import { RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { ClassificationConfig } from "@/lib/types";
 import { createBatchJob, BatchJob } from "@/lib/openai/trueBatchAPI";
+import { logger } from "@/lib/logger";
 
 interface BatchTextInputProps {
   payeeNames: string;
@@ -44,21 +45,34 @@ const BatchTextInput = ({
 
     try {
       const names = payeeNames.split("\n").map(name => name.trim()).filter(name => name !== "");
-      console.log(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
+      logger.info(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
+      
+      // Show immediate feedback
+      toast({
+        title: "Creating Batch Job",
+        description: `Submitting ${names.length} payees to OpenAI for batch processing...`,
+      });
       
       const batchJob = await createBatchJob(names, `Text input batch: ${names.length} payees`);
-      console.log(`[BATCH TEXT INPUT] Batch job created:`, batchJob);
+      logger.info(`[BATCH TEXT INPUT] Batch job created successfully:`, batchJob);
 
-      onBatchJobCreated(batchJob, names);
+      // Call the callback to add the job to storage
+      logger.info('[BATCH TEXT INPUT] Calling onBatchJobCreated callback...');
+      await onBatchJobCreated(batchJob, names);
+      logger.info('[BATCH TEXT INPUT] Callback completed successfully');
 
       toast({
-        title: "Batch Job Created",
-        description: `Successfully submitted ${names.length} payees for batch processing. Job ID: ${batchJob.id.slice(-8)}`,
+        title: "Batch Job Created Successfully",
+        description: `Job ${batchJob.id.slice(-8)} submitted with ${names.length} payees. Check the Batch Jobs section below.`,
       });
+
+      // Clear the form after successful submission
+      setPayeeNames("");
+      
     } catch (error) {
-      console.error("Batch job creation error:", error);
+      logger.error("[BATCH TEXT INPUT] Batch job creation error:", error);
       toast({
-        title: "Batch Job Creation Error",
+        title: "Batch Job Creation Failed",
         description: error instanceof Error ? error.message : "An error occurred while creating the batch job.",
         variant: "destructive",
       });
