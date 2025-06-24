@@ -35,18 +35,26 @@ export const useBatchJobs = () => {
       logger.info(`[USE BATCH JOBS] Adding job: ${batchJob.id}`);
       setError(null);
       
+      // Add to storage first
       await batchJobService.addJob(batchJob, payeeNames, originalFileData);
-      logger.info('[USE BATCH JOBS] Job added successfully, reloading jobs list');
+      logger.info('[USE BATCH JOBS] Job added to storage successfully');
       
-      // Reload jobs to ensure UI is updated
-      await loadJobs();
+      // Immediately update the UI state with the new job
+      const newStoredJob: StoredBatchJob = {
+        ...batchJob,
+        payeeNames,
+        originalFileData: originalFileData.length < 1000 ? originalFileData : [],
+        created_at: Date.now()
+      };
       
-      logger.info('[USE BATCH JOBS] Jobs list reloaded after adding new job');
+      setBatchJobs(prev => [newStoredJob, ...prev]);
+      logger.info('[USE BATCH JOBS] UI state updated with new job');
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add job';
       logger.error('[USE BATCH JOBS] Error adding job:', error);
       setError(errorMessage);
-      throw error; // Re-throw so calling code can handle it
+      throw error;
     }
   };
 
@@ -55,6 +63,7 @@ export const useBatchJobs = () => {
       logger.info(`[USE BATCH JOBS] Updating job: ${updatedJob.id}`);
       setError(null);
       
+      // Update storage
       await batchJobService.updateJob(updatedJob);
       
       // Update local state immediately for better UX
@@ -77,16 +86,19 @@ export const useBatchJobs = () => {
       logger.info(`[USE BATCH JOBS] Deleting job: ${jobId}`);
       setError(null);
       
-      await batchJobService.deleteJob(jobId);
-      
       // Update local state immediately
       setBatchJobs(prev => prev.filter(job => job.id !== jobId));
+      
+      // Then update storage
+      await batchJobService.deleteJob(jobId);
       
       logger.info('[USE BATCH JOBS] Job deleted successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete job';
       logger.error('[USE BATCH JOBS] Error deleting job:', error);
       setError(errorMessage);
+      // Revert the optimistic update on error
+      await loadJobs();
     }
   };
 
