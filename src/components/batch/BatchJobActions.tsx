@@ -25,11 +25,13 @@ const BatchJobActions = ({
   // Jobs that can be cancelled (only in progress states)
   const canCancel = ['validating', 'in_progress', 'finalizing'].includes(job.status);
   
-  // Jobs that can be deleted (finished states)
+  // Jobs that can be deleted/removed (finished states including cancelled)
   const canDelete = ['completed', 'failed', 'expired', 'cancelled'].includes(job.status);
   
   // Jobs that can be downloaded
   const canDownload = job.status === 'completed';
+
+  console.log(`[BATCH ACTIONS] Job ${job.id.slice(-8)} - Status: ${job.status}, canDelete: ${canDelete}, canCancel: ${canCancel}`);
 
   return (
     <div className="flex gap-2 flex-wrap">
@@ -75,12 +77,13 @@ const BatchJobActions = ({
         </Button>
       )}
 
-      {/* Delete/Remove Button - only for finished jobs */}
+      {/* Delete/Remove Button - for finished jobs including cancelled */}
       {canDelete && (
         <Button
           size="sm"
           variant="outline"
           onClick={() => onDeleteJob(job.id)}
+          className="text-red-600 hover:text-red-700 hover:bg-red-50"
         >
           <Trash className="h-3 w-3 mr-1" />
           Remove
