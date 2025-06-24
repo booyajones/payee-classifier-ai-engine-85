@@ -155,7 +155,14 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   };
 
   const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[] = []) => {
+    logger.info(`[BATCH FORM] === BATCH JOB CREATION STARTED ===`);
     logger.info(`[BATCH FORM] Handling batch job creation: ${batchJob.id}`);
+    logger.info(`[BATCH FORM] Job details:`, {
+      id: batchJob.id.slice(-8),
+      status: batchJob.status,
+      payeeCount: payeeNames.length,
+      dataRowsCount: originalFileData.length
+    });
     
     if (!isApiKeyValid) {
       const error = "Please set a valid OpenAI API key before creating batch jobs.";
@@ -169,18 +176,27 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     }
     
     try {
-      logger.info(`[BATCH FORM] Adding job to persistent storage...`);
-      await addPersistentJob(batchJob, payeeNames, originalFileData);
-      logger.info(`[BATCH FORM] Job added successfully, running storage cleanup`);
+      logger.info(`[BATCH FORM] API key valid, adding job to persistent storage...`);
       
-      storageService.cleanup();
-      
+      // Show immediate feedback
       toast({
-        title: "Batch Job Created Successfully",
-        description: `Created batch job ${batchJob.id.slice(-8)} with ${payeeNames.length} payees. Monitor progress below.`,
+        title: "Creating Batch Job",
+        description: `Adding job ${batchJob.id.slice(-8)} to your jobs list...`,
       });
       
-      logger.info(`[BATCH FORM] Batch job creation completed successfully`);
+      await addPersistentJob(batchJob, payeeNames, originalFileData);
+      logger.info(`[BATCH FORM] Job added to persistent storage successfully`);
+      
+      // Additional success feedback
+      toast({
+        title: "Batch Job Added Successfully",
+        description: `Job ${batchJob.id.slice(-8)} is now in your jobs list below. Monitor its progress there.`,
+      });
+      
+      logger.info(`[BATCH FORM] Running storage cleanup...`);
+      storageService.cleanup();
+      
+      logger.info(`[BATCH FORM] === BATCH JOB CREATION COMPLETED ===`);
     } catch (error) {
       logger.error('[BATCH FORM] Error adding batch job:', error);
       toast({

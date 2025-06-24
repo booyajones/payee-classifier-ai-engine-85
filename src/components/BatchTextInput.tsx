@@ -45,7 +45,8 @@ const BatchTextInput = ({
 
     try {
       const names = payeeNames.split("\n").map(name => name.trim()).filter(name => name !== "");
-      logger.info(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names);
+      logger.info(`[BATCH TEXT INPUT] === CREATING BATCH JOB ===`);
+      logger.info(`[BATCH TEXT INPUT] Creating batch job for ${names.length} names:`, names.slice(0, 5)); // Log first 5 names
       
       // Show immediate feedback
       toast({
@@ -54,7 +55,12 @@ const BatchTextInput = ({
       });
       
       const batchJob = await createBatchJob(names, `Text input batch: ${names.length} payees`);
-      logger.info(`[BATCH TEXT INPUT] Batch job created successfully:`, batchJob);
+      logger.info(`[BATCH TEXT INPUT] Batch job created successfully:`, {
+        id: batchJob.id.slice(-8),
+        status: batchJob.status,
+        endpoint: batchJob.endpoint,
+        completion_window: batchJob.completion_window
+      });
 
       // Call the callback to add the job to storage
       logger.info('[BATCH TEXT INPUT] Calling onBatchJobCreated callback...');
@@ -68,6 +74,7 @@ const BatchTextInput = ({
 
       // Clear the form after successful submission
       setPayeeNames("");
+      logger.info('[BATCH TEXT INPUT] === BATCH JOB CREATION FLOW COMPLETED ===');
       
     } catch (error) {
       logger.error("[BATCH TEXT INPUT] Batch job creation error:", error);

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { AlertCircle, RefreshCw } from "lucide-react";
@@ -35,6 +35,18 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
   const { toast } = useToast();
 
   const { batchJobs, isLoading, error, updateJob, deleteJob, getStorageInfo, refreshJobs } = useBatchJobs();
+  
+  // Add debugging for when the component re-renders
+  useEffect(() => {
+    logger.info(`[BATCH JOB MANAGER] Component rendered - jobs count: ${batchJobs.length}`);
+    if (batchJobs.length > 0) {
+      logger.info(`[BATCH JOB MANAGER] Jobs in state:`, batchJobs.map(job => ({
+        id: job.id.slice(-8),
+        status: job.status,
+        created_at: job.created_at
+      })));
+    }
+  }, [batchJobs]);
   
   const handleJobCompleted = async (completedJob: BatchJob) => {
     logger.info(`[BATCH JOB MANAGER] Job completed: ${completedJob.id}`);
@@ -123,8 +135,14 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
   const storageInfo = getStorageInfo();
 
   logger.info(`[BATCH JOB MANAGER] Rendering ${sortedJobs.length} valid jobs (${invalidJobsCount} invalid filtered)`);
+  logger.info(`[BATCH JOB MANAGER] Sorted jobs for display:`, sortedJobs.map(job => ({
+    id: job.id.slice(-8),
+    status: job.status,
+    created_at: job.created_at
+  })));
 
   if (batchJobs.length === 0) {
+    logger.info('[BATCH JOB MANAGER] No jobs to display - showing empty state');
     return (
       <>
         <StorageStatusIndicator 
@@ -140,6 +158,8 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
     );
   }
 
+  logger.info('[BATCH JOB MANAGER] Rendering jobs list');
+
   return (
     <>
       <div className="space-y-4">
@@ -149,7 +169,7 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
         />
         
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium">Batch Jobs</h3>
+          <h3 className="text-lg font-medium">Batch Jobs ({sortedJobs.length})</h3>
           <Button
             variant="outline"
             size="sm"
@@ -169,20 +189,23 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
           </Alert>
         )}
         
-        {sortedJobs.map((job) => (
-          <EnhancedBatchJobCard
-            key={job.id}
-            job={job}
-            pollingState={pollingStates[job.id]}
-            payeeCount={job.payeeNames?.length || 0}
-            isRefreshing={refreshingJobs.has(job.id)}
-            isDownloading={downloadingJobs.has(job.id)}
-            onManualRefresh={handleManualRefresh}
-            onDownloadResults={handleDownloadResults}
-            onCancelJob={showCancelConfirmation}
-            onDeleteJob={showDeleteConfirmation}
-          />
-        ))}
+        {sortedJobs.map((job) => {
+          logger.info(`[BATCH JOB MANAGER] Rendering job card for: ${job.id.slice(-8)}`);
+          return (
+            <EnhancedBatchJobCard
+              key={job.id}
+              job={job}
+              pollingState={pollingStates[job.id]}
+              payeeCount={job.payeeNames?.length || 0}
+              isRefreshing={refreshingJobs.has(job.id)}
+              isDownloading={downloadingJobs.has(job.id)}
+              onManualRefresh={handleManualRefresh}
+              onDownloadResults={handleDownloadResults}
+              onCancelJob={showCancelConfirmation}
+              onDeleteJob={showDeleteConfirmation}
+            />
+          );
+        })}
       </div>
 
       <ConfirmationDialog

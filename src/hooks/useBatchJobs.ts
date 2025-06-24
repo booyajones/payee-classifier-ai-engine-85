@@ -14,13 +14,26 @@ export const useBatchJobs = () => {
     loadJobs();
   }, []);
 
+  // Add debugging to track state changes
+  useEffect(() => {
+    logger.info(`[USE BATCH JOBS] State updated - current jobs count: ${batchJobs.length}`);
+    if (batchJobs.length > 0) {
+      logger.info(`[USE BATCH JOBS] Current job IDs:`, batchJobs.map(job => ({
+        id: job.id.slice(-8),
+        status: job.status,
+        created_at: job.created_at
+      })));
+    }
+  }, [batchJobs]);
+
   const loadJobs = async () => {
     try {
       logger.info('[USE BATCH JOBS] Loading jobs...');
       setError(null);
       const jobs = await batchJobService.loadJobs();
-      logger.info(`[USE BATCH JOBS] Loaded ${jobs.length} jobs, updating state`);
+      logger.info(`[USE BATCH JOBS] Loaded ${jobs.length} jobs from storage`);
       setBatchJobs(jobs);
+      logger.info(`[USE BATCH JOBS] State set with ${jobs.length} jobs`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load jobs';
       logger.error('[USE BATCH JOBS] Error loading jobs:', error);
@@ -32,14 +45,12 @@ export const useBatchJobs = () => {
 
   const addJob = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => {
     try {
+      logger.info(`[USE BATCH JOBS] === STARTING ADD JOB PROCESS ===`);
       logger.info(`[USE BATCH JOBS] Adding job: ${batchJob.id}`);
+      logger.info(`[USE BATCH JOBS] Current jobs count before add: ${batchJobs.length}`);
       setError(null);
       
-      // Add to storage first
-      await batchJobService.addJob(batchJob, payeeNames, originalFileData);
-      logger.info('[USE BATCH JOBS] Job added to storage successfully');
-      
-      // Immediately update the UI state with the new job
+      // Create the stored job object first
       const newStoredJob: StoredBatchJob = {
         ...batchJob,
         payeeNames,
@@ -47,8 +58,30 @@ export const useBatchJobs = () => {
         created_at: Date.now()
       };
       
-      setBatchJobs(prev => [newStoredJob, ...prev]);
-      logger.info('[USE BATCH JOBS] UI state updated with new job');
+      logger.info(`[USE BATCH JOBS] Created stored job object:`, {
+        id: newStoredJob.id.slice(-8),
+        status: newStoredJob.status,
+        payeeCount: newStoredJob.payeeNames.length,
+        created_at: newStoredJob.created_at
+      });
+      
+      // Add to storage first
+      await batchJobService.addJob(batchJob, payeeNames, originalFileData);
+      logger.info('[USE BATCH JOBS] Job added to storage successfully');
+      
+      // Immediately update the UI state with the new job
+      logger.info('[USE BATCH JOBS] Updating UI state...');
+      setBatchJobs(prev => {
+        const newJobsList = [newStoredJob, ...prev];
+        logger.info(`[USE BATCH JOBS] UI state update - prev: ${prev.length}, new: ${newJobsList.length}`);
+        logger.info(`[USE BATCH JOBS] New job added to front:`, {
+          id: newStoredJob.id.slice(-8),
+          status: newStoredJob.status
+        });
+        return newJobsList;
+      });
+      
+      logger.info('[USE BATCH JOBS] === ADD JOB PROCESS COMPLETED ===');
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add job';
