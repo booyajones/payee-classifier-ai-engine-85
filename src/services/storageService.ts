@@ -57,7 +57,7 @@ class UnifiedStorageService implements StorageService {
     }
 
     // Fallback to memory storage
-    logger.log(`[STORAGE] Using memory storage for ${key}`);
+    logger.info(`[STORAGE] Using memory storage for ${key}`);
     this.memoryStorage[key] = value;
     this._isUsingFallback = true;
     this._storageStatus = 'memory';
@@ -143,7 +143,7 @@ class UnifiedStorageService implements StorageService {
       if (cleanupSuccess) {
         try {
           localStorage.setItem(key, value);
-          logger.log(`[STORAGE] Successfully saved ${key} after cleanup`);
+          logger.info(`[STORAGE] Successfully saved ${key} after cleanup`);
           return true;
         } catch (retryError) {
           logger.error(`[STORAGE] Still failed after cleanup:`, retryError);
@@ -156,7 +156,7 @@ class UnifiedStorageService implements StorageService {
 
   private emergencyCleanup(): boolean {
     try {
-      logger.log('[STORAGE] EMERGENCY CLEANUP INITIATED');
+      logger.info('[STORAGE] EMERGENCY CLEANUP INITIATED');
       
       // Remove processing results
       const allKeys = Object.keys(localStorage);
@@ -186,7 +186,7 @@ class UnifiedStorageService implements StorageService {
         }
       }
       
-      logger.log('[STORAGE] Emergency cleanup complete');
+      logger.info('[STORAGE] Emergency cleanup complete');
       return true;
     } catch (error) {
       logger.error('[STORAGE] Emergency cleanup failed:', error);
@@ -196,7 +196,7 @@ class UnifiedStorageService implements StorageService {
 
   private regularCleanup(): boolean {
     try {
-      logger.log('[STORAGE] Regular cleanup triggered');
+      logger.info('[STORAGE] Regular cleanup triggered');
       
       // Clean old processing results
       const allKeys = Object.keys(localStorage);
