@@ -64,63 +64,34 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   }, [toast]);
 
   const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[] = []) => {
-    logger.info(`[BATCH FORM] === BATCH JOB CREATION STARTED ===`);
     logger.info(`[BATCH FORM] Handling batch job creation: ${batchJob.id}`);
-    logger.info(`[BATCH FORM] Job details:`, {
-      id: batchJob.id.slice(-8),
-      status: batchJob.status,
-      payeeCount: payeeNames.length,
-      dataRowsCount: originalFileData.length
-    });
     
     if (!isApiKeyValid) {
-      const error = "Please set a valid OpenAI API key before creating batch jobs.";
-      logger.error(`[BATCH FORM] ${error}`);
       toast({
         title: "API Key Required",
-        description: error,
+        description: "Please set a valid OpenAI API key before creating batch jobs.",
         variant: "destructive"
       });
       return;
     }
     
     try {
-      logger.info(`[BATCH FORM] API key valid, adding job to persistent storage...`);
-      
-      // Show immediate feedback
-      toast({
-        title: "Adding Batch Job",
-        description: `Adding job ${batchJob.id.slice(-8)} to your jobs list...`,
-      });
-      
+      // This will immediately show the job in the UI
       await addJob(batchJob, payeeNames, originalFileData);
-      logger.info(`[BATCH FORM] Job added to persistent storage successfully`);
       
-      // Additional success feedback
       toast({
-        title: "Batch Job Added Successfully",
-        description: `Job ${batchJob.id.slice(-8)} is now in your jobs list below. Monitor its progress there.`,
+        title: "Success!",
+        description: `Batch job ${batchJob.id.slice(-8)} added to your jobs list.`,
       });
       
-      logger.info(`[BATCH FORM] Running storage cleanup...`);
       storageService.cleanup();
       
-      logger.info(`[BATCH FORM] === BATCH JOB CREATION COMPLETED ===`);
     } catch (error) {
       logger.error('[BATCH FORM] Error adding batch job:', error);
       toast({
         title: "Failed to Save Batch Job",
-        description: error instanceof Error ? error.message : "Unknown error occurred. Check console for details.",
+        description: error instanceof Error ? error.message : "Unknown error occurred.",
         variant: "destructive"
-      });
-      
-      // Log additional debugging info
-      logger.error('[BATCH FORM] Additional error context:', {
-        batchJobId: batchJob?.id,
-        payeeCount: payeeNames?.length,
-        dataCount: originalFileData?.length,
-        errorType: error?.constructor?.name,
-        errorMessage: error instanceof Error ? error.message : String(error)
       });
     }
   };

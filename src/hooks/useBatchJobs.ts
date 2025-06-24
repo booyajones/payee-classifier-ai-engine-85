@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { StoredBatchJob } from '@/lib/storage/batchJobStorage';
@@ -65,21 +64,16 @@ export const useBatchJobs = () => {
         created_at: newStoredJob.created_at
       });
       
-      // Immediately update the UI state with the new job for instant feedback
+      // IMMEDIATELY update the UI state first
       setBatchJobs(prev => {
         const newJobsList = [newStoredJob, ...prev];
-        logger.info(`[USE BATCH JOBS] UI state update (optimistic) - prev: ${prev.length}, new: ${newJobsList.length}`);
+        logger.info(`[USE BATCH JOBS] UI updated immediately - now showing ${newJobsList.length} jobs`);
         return newJobsList;
       });
       
-      // Add to storage in the background
+      // Then save to storage in background
       await batchJobService.addJob(batchJob, payeeNames, originalFileData);
-      logger.info('[USE BATCH JOBS] Job added to storage successfully');
-      
-      // Force a reload to ensure consistency between UI and storage
-      await loadJobs();
-      
-      logger.info('[USE BATCH JOBS] === ADD JOB PROCESS COMPLETED ===');
+      logger.info('[USE BATCH JOBS] Job saved to storage successfully');
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add job';
