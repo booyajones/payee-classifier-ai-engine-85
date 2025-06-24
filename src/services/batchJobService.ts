@@ -1,162 +1,165 @@
+
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { StoredBatchJob, isValidBatchJobId } from '@/lib/storage/batchJobStorage';
-import { storageService } from './storageService';
 import { logger } from '@/lib/logger';
 
-const STORAGE_KEY = 'batchJobs';
+// Use the same storage key as the rest of the system
+const STORAGE_KEY = 'lovable_batch_jobs';
 
-export class BatchJobService {
-  async loadJobs(): Promise<StoredBatchJob[]> {
-    try {
-      logger.info('[BATCH SERVICE] Loading jobs from storage...');
-      const stored = storageService.getItem(STORAGE_KEY);
-      if (!stored) {
-        logger.info('[BATCH SERVICE] No stored jobs found');
-        return [];
-      }
-      
-      const jobs: StoredBatchJob[] = JSON.parse(stored);
-      logger.info(`[BATCH SERVICE] Found ${jobs.length} stored jobs`);
-      
-      const validJobs = jobs.filter(job => {
-        const isValid = isValidBatchJobId(job.id);
-        if (!isValid) {
-          logger.warn(`[BATCH SERVICE] Removing invalid job: ${job.id}`);
-        }
-        return isValid;
-      });
-      
-      if (validJobs.length !== jobs.length) {
-        logger.info(`[BATCH SERVICE] Filtered out ${jobs.length - validJobs.length} invalid jobs`);
-        await this.saveJobs(validJobs);
-      }
-      
-      logger.info(`[BATCH SERVICE] Successfully loaded ${validJobs.length} valid jobs`);
-      return validJobs;
-    } catch (error) {
-      logger.error('[BATCH SERVICE] Error loading jobs:', error);
-      return [];
-    }
+interface StorageInfo {
+  storageStatus: 'localStorage' | 'sessionStorage' | 'memory';
+  isUsingFallback: boolean;
+}
+
+class BatchJobService {
+  private jobs: Map<string, StoredBatchJob> = new Map();
+  private storageAvailable = false;
+  private storageType: 'localStorage' | 'sessionStorage' | 'memory' = 'memory';
+
+  constructor() {
+    this.initializeStorage();
   }
 
-  async saveJobs(jobs: StoredBatchJob[]): Promise<boolean> {
+  private initializeStorage() {
+    // Try localStorage first
     try {
-      logger.info(`[BATCH SERVICE] Attempting to save ${jobs.length} jobs to storage`);
-      
-      // Check storage before saving
-      const storageInfo = this.getStorageInfo();
-      logger.info(`[BATCH SERVICE] Storage status: ${storageInfo.storageStatus}, fallback: ${storageInfo.isUsingFallback}`);
-      
-      // Run cleanup before saving if storage is getting full
-      const currentSize = storageService.getSize();
-      const maxSize = 4 * 1024 * 1024; // 4MB
-      const usagePercent = currentSize / maxSize;
-      
-      if (usagePercent > 0.7) {
-        logger.info(`[BATCH SERVICE] Storage usage at ${(usagePercent * 100).toFixed(1)}%, running cleanup`);
-        storageService.cleanup();
-      }
-      
-      const success = storageService.setItem(STORAGE_KEY, JSON.stringify(jobs));
-      if (!success) {
-        logger.error('[BATCH SERVICE] Failed to save jobs to storage');
-        return false;
-      }
-      
-      logger.info(`[BATCH SERVICE] Successfully saved ${jobs.length} jobs to storage`);
+      const testKey = 'test_storage';
+      localStorage.setItem(testKey, 'test');
+      localStorage.removeItem(testKey);
+      this.storageAvailable = true;
+      this.storageType = 'localStorage';
+      logger.info('[BATCH JOB SERVICE] Using localStorage');
+      return;
+    } catch (error) {
+      logger.warn('[BATCH JOB SERVICE] localStorage not available:', error);
+    }
+
+    // Try sessionStorage as fallback
+    try {
+      const testKey = 'test_storage';
+      sessionStorage.setItem(testKey, 'test');
+      sessionStorage.removeItem(testKey);
+      this.storageAvailable = true;
+      this.storageType = 'sessionStorage';
+      logger.info('[BATCH JOB SERVICE] Using sessionStorage as fallback');
+      return;
+    } catch (error) {
+      logger.warn('[BATCH JOB SERVICE] sessionStorage not available:', error);
+    }
+
+    // Use in-memory storage as last resort
+    this.storageAvailable = false;
+    this.storageType = 'memory';
+    logger.warn('[BATCH JOB SERVICE] Using in-memory storage only');
+  }
+
+  private getStorage() {
+    return this.storageType === 'localStorage' ? localStorage : sessionStorage;
+  }
+
+  private saveToStorage(jobs: StoredBatchJob[]): boolean {
+    if (!this.storageAvailable) {
+      return false;
+    }
+
+    try {
+      const storage = this.getStorage();
+      storage.setItem(STORAGE_KEY, JSON.stringify(jobs));
       return true;
     } catch (error) {
-      logger.error('[BATCH SERVICE] Error saving jobs:', error);
+      logger.error('[BATCH JOB SERVICE] Failed to save to storage:', error);
       return false;
     }
   }
 
-  async addJob(batchJob: BatchJob, payeeNames: string[], originalFileData: any[]): Promise<void> {
-    logger.info(`[BATCH SERVICE] Starting to add job: ${batchJob.id}`);
-    logger.info(`[BATCH SERVICE] Job details - Status: ${batchJob.status}, Payees: ${payeeNames.length}, Data rows: ${originalFileData.length}`);
-    
-    if (!isValidBatchJobId(batchJob.id)) {
-      const error = `Invalid batch job ID format: ${batchJob.id}`;
-      logger.error(`[BATCH SERVICE] ${error}`);
-      throw new Error(error);
+  private loadFromStorage(): StoredBatchJob[] {
+    if (!this.storageAvailable) {
+      return Array.from(this.jobs.values());
     }
 
-    // Check if we should store file data based on storage constraints
-    const shouldStoreFileData = !storageService.isUsingFallback && originalFileData.length < 1000;
-    logger.info(`[BATCH SERVICE] Will store file data: ${shouldStoreFileData} (fallback: ${storageService.isUsingFallback}, rows: ${originalFileData.length})`);
+    try {
+      const storage = this.getStorage();
+      const stored = storage.getItem(STORAGE_KEY);
+      if (stored) {
+        const jobs: StoredBatchJob[] = JSON.parse(stored);
+        return jobs.filter(job => isValidBatchJobId(job.id));
+      }
+    } catch (error) {
+      logger.error('[BATCH JOB SERVICE] Failed to load from storage:', error);
+    }
+
+    return Array.from(this.jobs.values());
+  }
+
+  async loadJobs(): Promise<StoredBatchJob[]> {
+    const jobs = this.loadFromStorage();
     
+    // Update in-memory map
+    this.jobs.clear();
+    jobs.forEach(job => this.jobs.set(job.id, job));
+    
+    logger.info(`[BATCH JOB SERVICE] Loaded ${jobs.length} jobs`);
+    return jobs;
+  }
+
+  async addJob(batchJob: BatchJob, payeeNames: string[], originalFileData: any[]): Promise<void> {
+    if (!isValidBatchJobId(batchJob.id)) {
+      throw new Error(`Invalid batch job ID format: ${batchJob.id}`);
+    }
+
     const storedJob: StoredBatchJob = {
       ...batchJob,
       payeeNames,
-      originalFileData: shouldStoreFileData ? originalFileData : [],
+      originalFileData: originalFileData.length < 1000 ? originalFileData : [],
       created_at: Date.now()
     };
+
+    // Add to memory first
+    this.jobs.set(batchJob.id, storedJob);
     
-    logger.info('[BATCH SERVICE] Created stored job object, loading existing jobs...');
-    const jobs = await this.loadJobs();
-    logger.info(`[BATCH SERVICE] Loaded ${jobs.length} existing jobs`);
+    // Then save to storage
+    const allJobs = Array.from(this.jobs.values()).sort((a, b) => b.created_at - a.created_at);
+    const saved = this.saveToStorage(allJobs);
     
-    const newJobs = [storedJob, ...jobs];
-    logger.info(`[BATCH SERVICE] Created new jobs array with ${newJobs.length} total jobs`);
-    
-    const saved = await this.saveJobs(newJobs);
-    if (!saved && storageService.isUsingFallback) {
-      logger.warn('[BATCH SERVICE] Save failed, using fallback strategy');
-      // Keep only essential jobs in memory
-      const essentialJobs = newJobs.filter(job => 
-        ['in_progress', 'validating', 'finalizing'].includes(job.status)
-      ).slice(0, 5);
-      logger.info(`[BATCH SERVICE] Keeping ${essentialJobs.length} essential jobs in fallback storage`);
-      await this.saveJobs(essentialJobs);
-    }
-    
-    logger.info(`[BATCH SERVICE] Successfully added job: ${batchJob.id} (storage success: ${saved})`);
+    logger.info(`[BATCH JOB SERVICE] Added job ${batchJob.id} (storage: ${saved ? 'success' : 'memory-only'})`);
   }
 
   async updateJob(updatedJob: BatchJob): Promise<void> {
-    logger.info(`[BATCH SERVICE] Updating job: ${updatedJob.id} to status: ${updatedJob.status}`);
-    
     if (!isValidBatchJobId(updatedJob.id)) {
-      logger.error(`[BATCH SERVICE] Cannot update invalid job ID: ${updatedJob.id}`);
+      logger.error(`[BATCH JOB SERVICE] Cannot update invalid job ID: ${updatedJob.id}`);
       return;
     }
 
-    const jobs = await this.loadJobs();
-    const jobIndex = jobs.findIndex(job => job.id === updatedJob.id);
-    
-    if (jobIndex === -1) {
-      logger.warn(`[BATCH SERVICE] Job not found for update: ${updatedJob.id}`);
+    const existingJob = this.jobs.get(updatedJob.id);
+    if (!existingJob) {
+      logger.warn(`[BATCH JOB SERVICE] Job ${updatedJob.id} not found for update`);
       return;
     }
+
+    // Update in memory
+    const updatedStoredJob = { ...existingJob, ...updatedJob };
+    this.jobs.set(updatedJob.id, updatedStoredJob);
     
-    const newJobs = jobs.map(job => 
-      job.id === updatedJob.id 
-        ? { ...job, ...updatedJob }
-        : job
-    );
+    // Save to storage
+    const allJobs = Array.from(this.jobs.values()).sort((a, b) => b.created_at - a.created_at);
+    const saved = this.saveToStorage(allJobs);
     
-    const saved = await this.saveJobs(newJobs);
-    logger.info(`[BATCH SERVICE] Updated job: ${updatedJob.id} (storage success: ${saved})`);
+    logger.info(`[BATCH JOB SERVICE] Updated job ${updatedJob.id} (storage: ${saved ? 'success' : 'memory-only'})`);
   }
 
   async deleteJob(jobId: string): Promise<void> {
-    logger.info(`[BATCH SERVICE] Deleting job: ${jobId}`);
-    const jobs = await this.loadJobs();
-    const newJobs = jobs.filter(job => job.id !== jobId);
-    await this.saveJobs(newJobs);
-    logger.info(`[BATCH SERVICE] Deleted job: ${jobId} (${jobs.length - newJobs.length} jobs removed)`);
+    this.jobs.delete(jobId);
+    
+    const allJobs = Array.from(this.jobs.values()).sort((a, b) => b.created_at - a.created_at);
+    const saved = this.saveToStorage(allJobs);
+    
+    logger.info(`[BATCH JOB SERVICE] Deleted job ${jobId} (storage: ${saved ? 'success' : 'memory-only'})`);
   }
 
-  async getJobById(jobId: string): Promise<StoredBatchJob | undefined> {
-    const jobs = await this.loadJobs();
-    return jobs.find(job => job.id === jobId);
-  }
-
-  getStorageInfo() {
+  getStorageInfo(): StorageInfo {
     return {
-      storageStatus: storageService.storageStatus,
-      isUsingFallback: storageService.isUsingFallback,
-      storageSize: storageService.getSize()
+      storageStatus: this.storageType,
+      isUsingFallback: this.storageType !== 'localStorage'
     };
   }
 }

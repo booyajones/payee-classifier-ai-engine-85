@@ -8,19 +8,16 @@ import FileUploadInput from "./file-upload/FileUploadInput";
 import ValidationErrorDisplay from "./file-upload/ValidationErrorDisplay";
 import ColumnSelector from "./file-upload/ColumnSelector";
 import FileUploadActions from "./file-upload/FileUploadActions";
-import ProcessingModeSelector, { ProcessingMode } from "./file-upload/ProcessingModeSelector";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { useToast } from "@/components/ui/use-toast";
 
 interface FileUploadFormProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
-  onDirectProcessing?: (originalFileData: any[], selectedColumn: string) => Promise<void>;
   isProcessing?: boolean;
 }
 
-const FileUploadForm = ({ onBatchJobCreated, onDirectProcessing, isProcessing = false }: FileUploadFormProps) => {
+const FileUploadForm = ({ onBatchJobCreated, isProcessing = false }: FileUploadFormProps) => {
   const { toast } = useToast();
-  const [processingMode, setProcessingMode] = useState<ProcessingMode>('direct');
 
   const {
     file,
@@ -75,31 +72,18 @@ const FileUploadForm = ({ onBatchJobCreated, onDirectProcessing, isProcessing = 
       return;
     }
 
-    if (processingMode === 'direct' && onDirectProcessing) {
-      // Use direct processing with original file data and selected column
-      console.log(`[FILE UPLOAD] Starting direct processing with column: ${selectedColumn}`);
-      await onDirectProcessing(validationResult.originalData, selectedColumn);
-    } else if (processingMode === 'batch') {
-      // Use batch job creation (extract names for batch API)
-      const payeeNames: string[] = [];
-      for (const row of validationResult.originalData) {
-        const payeeName = String(row[selectedColumn] || '').trim();
-        payeeNames.push(payeeName || '[Empty]');
-      }
-      console.log(`[FILE UPLOAD] Starting batch job creation with column: ${selectedColumn}`);
-      await submitFileForProcessing({ ...validationResult, payeeNames }, selectedColumn);
-    } else {
-      toast({
-        title: "Configuration Error",
-        description: "Selected processing mode is not available",
-        variant: "destructive",
-      });
+    // Always use batch processing - extract names for batch API
+    const payeeNames: string[] = [];
+    for (const row of validationResult.originalData) {
+      const payeeName = String(row[selectedColumn] || '').trim();
+      payeeNames.push(payeeName || '[Empty]');
     }
+    console.log(`[FILE UPLOAD] Starting batch job creation with column: ${selectedColumn}`);
+    await submitFileForProcessing({ ...validationResult, payeeNames }, selectedColumn);
   };
 
   const handleReset = () => {
     resetValidation();
-    setProcessingMode('direct');
     
     // Clear the file input
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -118,14 +102,10 @@ const FileUploadForm = ({ onBatchJobCreated, onDirectProcessing, isProcessing = 
 
   const getProcessButtonText = () => {
     if (actualIsLoading) {
-      if (processingMode === 'direct') {
-        return isRetrying ? `Retrying (${retryCount + 1})...` : "Processing...";
-      } else {
-        return isRetrying ? `Retrying (${retryCount + 1})...` : "Creating Batch Job...";
-      }
+      return isRetrying ? `Retrying (${retryCount + 1})...` : "Creating Batch Job...";
     }
     
-    return processingMode === 'direct' ? "Process File" : "Create Batch Job";
+    return "Create Batch Job";
   };
 
   return (
@@ -145,12 +125,6 @@ const FileUploadForm = ({ onBatchJobCreated, onDirectProcessing, isProcessing = 
           selectedColumn={selectedColumn}
           onColumnChange={setSelectedColumn}
           fileInfo={fileInfo}
-        />
-
-        <ProcessingModeSelector
-          mode={processingMode}
-          onModeChange={setProcessingMode}
-          disabled={actualIsLoading || !validationResult}
         />
 
         <FileUploadActions

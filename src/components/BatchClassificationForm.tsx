@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,10 +10,8 @@ import APIKeyInput from "./APIKeyInput";
 import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
-import { enhancedCleanProcessBatch } from "@/lib/classification/enhancedCleanBatchProcessor";
 import { exportResultsFixed } from "@/lib/classification/fixedExporter";
 import { useBatchJobs } from "@/hooks/useBatchJobs";
-import { useProcessing } from "@/contexts/ProcessingContext";
 import { saveProcessingResults } from "@/lib/storage/resultStorage";
 import { storageService } from "@/services/storageService";
 import { logger } from "@/lib/logger";
@@ -28,10 +27,8 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const [processingSummary, setProcessingSummary] = useState<BatchProcessingResult | null>(null);
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { addJob, updateJob, removeJob } = useProcessing();
-  const { addJob: addPersistentJob } = useBatchJobs();
+  const { addJob } = useBatchJobs();
 
   useEffect(() => {
     const checkApiKey = async () => {
@@ -67,93 +64,6 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     checkApiKey();
   }, [toast]);
 
-  const handleDirectProcessing = async (originalFileData: any[], selectedColumn: string) => {
-    setIsProcessing(true);
-    
-    const jobId = `direct-${Date.now()}`;
-    
-    addJob({
-      id: jobId,
-      type: 'direct',
-      startTime: Date.now(),
-      totalRows: originalFileData.length,
-      processedRows: 0,
-      excludedCount: 0,
-      aiProcessedCount: 0,
-      errorCount: 0,
-      status: 'running'
-    });
-    
-    try {
-      const result = await enhancedCleanProcessBatch(
-        originalFileData, 
-        selectedColumn, 
-        {
-          aiThreshold: 75,
-          bypassRuleNLP: false,
-          useEnhanced: true,
-          offlineMode: false
-        },
-        (current, total, stats) => {
-          updateJob(jobId, {
-            processedRows: current,
-            excludedCount: stats.excludedCount,
-            aiProcessedCount: stats.aiProcessedCount,
-            errorCount: stats.errorCount,
-            processingSpeed: stats.processingSpeed,
-            estimatedTimeRemaining: stats.estimatedTimeRemaining
-          });
-        }
-      );
-      
-      updateJob(jobId, {
-        status: 'completed',
-        processedRows: originalFileData.length
-      });
-      
-      try {
-        const { saveProcessingResults, isSupabaseConfigured } = await import('@/lib/storage/resultStorage');
-        if (isSupabaseConfigured()) {
-          await saveProcessingResults(result.results, result, jobId, 'direct');
-        }
-      } catch (dbError) {
-        console.error('[BATCH FORM] Failed to save results to database:', dbError);
-        if (!dbError?.message?.includes('Database not configured')) {
-          toast({
-            title: "Warning",
-            description: "Processing completed but failed to save to database. Results are still available for export.",
-            variant: "destructive"
-          });
-        }
-      }
-      
-      setTimeout(() => removeJob(jobId), 5000);
-      
-      setBatchResults(result.results);
-      setProcessingSummary(result);
-      onComplete(result.results, result);
-      
-      storageService.cleanup();
-      
-      toast({
-        title: "Processing Complete",
-        description: `Successfully processed ${result.results.length} payees.`,
-      });
-      
-    } catch (error) {
-      updateJob(jobId, { status: 'failed' });
-      setTimeout(() => removeJob(jobId), 3000);
-      
-      toast({
-        title: "Processing Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[] = []) => {
     logger.info(`[BATCH FORM] === BATCH JOB CREATION STARTED ===`);
     logger.info(`[BATCH FORM] Handling batch job creation: ${batchJob.id}`);
@@ -184,7 +94,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         description: `Adding job ${batchJob.id.slice(-8)} to your jobs list...`,
       });
       
-      await addPersistentJob(batchJob, payeeNames, originalFileData);
+      await addJob(batchJob, payeeNames, originalFileData);
       logger.info(`[BATCH FORM] Job added to persistent storage successfully`);
       
       // Additional success feedback
@@ -289,8 +199,6 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     <div className="space-y-6">
       <FileUploadForm 
         onBatchJobCreated={handleBatchJobCreated}
-        onDirectProcessing={handleDirectProcessing}
-        isProcessing={isProcessing}
       />
 
       <BatchJobManager onJobComplete={handleJobComplete} />
@@ -299,7 +207,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
         batchResults={batchResults}
         processingSummary={processingSummary}
         onReset={handleReset}
-        isProcessing={isProcessing}
+        isProcessing={false}
         exportFunction={exportResultsFixed}
       />
     </div>
