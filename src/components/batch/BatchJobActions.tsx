@@ -22,11 +22,11 @@ const BatchJobActions = ({
   onCancelJob,
   onDeleteJob
 }: BatchJobActionsProps) => {
-  // Jobs that can be cancelled (only in progress states)
+  // Jobs that can be cancelled (only in progress states, not already cancelling)
   const canCancel = ['validating', 'in_progress', 'finalizing'].includes(job.status);
   
-  // Jobs that can be deleted/removed (finished states including cancelled)
-  const canDelete = ['completed', 'failed', 'expired', 'cancelled'].includes(job.status);
+  // Jobs that can be deleted/removed (finished states including cancelled and cancelling)
+  const canDelete = ['completed', 'failed', 'expired', 'cancelled', 'cancelling'].includes(job.status);
   
   // Jobs that can be downloaded
   const canDownload = job.status === 'completed';
@@ -77,7 +77,7 @@ const BatchJobActions = ({
         </Button>
       )}
 
-      {/* Delete/Remove Button - for finished jobs including cancelled */}
+      {/* Delete/Remove Button - for finished jobs including cancelled and cancelling */}
       {canDelete && (
         <Button
           size="sm"
