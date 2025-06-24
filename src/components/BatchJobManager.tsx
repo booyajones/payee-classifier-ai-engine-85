@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
@@ -36,14 +35,15 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
 
   const { batchJobs, isLoading, error, updateJob, deleteJob, getStorageInfo, refreshJobs } = useBatchJobs();
   
-  // Add debugging for when the component re-renders
+  // Enhanced debugging for when jobs change
   useEffect(() => {
-    logger.info(`[BATCH JOB MANAGER] Component rendered - jobs count: ${batchJobs.length}`);
+    logger.info(`[BATCH JOB MANAGER] Jobs updated - count: ${batchJobs.length}`);
+    logger.info(`[BATCH JOB MANAGER] Current storage info:`, getStorageInfo());
     if (batchJobs.length > 0) {
-      logger.info(`[BATCH JOB MANAGER] Jobs in state:`, batchJobs.map(job => ({
+      logger.info(`[BATCH JOB MANAGER] Job details:`, batchJobs.map(job => ({
         id: job.id.slice(-8),
         status: job.status,
-        created_at: job.created_at
+        created_at: new Date(job.created_at).toLocaleTimeString()
       })));
     }
   }, [batchJobs]);
@@ -134,12 +134,7 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
   const sortedJobs = [...validJobs].sort((a, b) => b.created_at - a.created_at);
   const storageInfo = getStorageInfo();
 
-  logger.info(`[BATCH JOB MANAGER] Rendering ${sortedJobs.length} valid jobs (${invalidJobsCount} invalid filtered)`);
-  logger.info(`[BATCH JOB MANAGER] Sorted jobs for display:`, sortedJobs.map(job => ({
-    id: job.id.slice(-8),
-    status: job.status,
-    created_at: job.created_at
-  })));
+  logger.info(`[BATCH JOB MANAGER] Rendering component - ${sortedJobs.length} valid jobs (${invalidJobsCount} invalid filtered)`);
 
   if (batchJobs.length === 0) {
     logger.info('[BATCH JOB MANAGER] No jobs to display - showing empty state');
@@ -157,8 +152,6 @@ const BatchJobManager = ({ onJobComplete }: BatchJobManagerProps) => {
       </>
     );
   }
-
-  logger.info('[BATCH JOB MANAGER] Rendering jobs list');
 
   return (
     <>

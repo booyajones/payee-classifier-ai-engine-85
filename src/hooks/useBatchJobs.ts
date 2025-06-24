@@ -65,21 +65,19 @@ export const useBatchJobs = () => {
         created_at: newStoredJob.created_at
       });
       
-      // Add to storage first
+      // Immediately update the UI state with the new job for instant feedback
+      setBatchJobs(prev => {
+        const newJobsList = [newStoredJob, ...prev];
+        logger.info(`[USE BATCH JOBS] UI state update (optimistic) - prev: ${prev.length}, new: ${newJobsList.length}`);
+        return newJobsList;
+      });
+      
+      // Add to storage in the background
       await batchJobService.addJob(batchJob, payeeNames, originalFileData);
       logger.info('[USE BATCH JOBS] Job added to storage successfully');
       
-      // Immediately update the UI state with the new job
-      logger.info('[USE BATCH JOBS] Updating UI state...');
-      setBatchJobs(prev => {
-        const newJobsList = [newStoredJob, ...prev];
-        logger.info(`[USE BATCH JOBS] UI state update - prev: ${prev.length}, new: ${newJobsList.length}`);
-        logger.info(`[USE BATCH JOBS] New job added to front:`, {
-          id: newStoredJob.id.slice(-8),
-          status: newStoredJob.status
-        });
-        return newJobsList;
-      });
+      // Force a reload to ensure consistency between UI and storage
+      await loadJobs();
       
       logger.info('[USE BATCH JOBS] === ADD JOB PROCESS COMPLETED ===');
       
@@ -87,6 +85,8 @@ export const useBatchJobs = () => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add job';
       logger.error('[USE BATCH JOBS] Error adding job:', error);
       setError(errorMessage);
+      // Revert optimistic update on error
+      await loadJobs();
       throw error;
     }
   };
@@ -96,9 +96,6 @@ export const useBatchJobs = () => {
       logger.info(`[USE BATCH JOBS] Updating job: ${updatedJob.id}`);
       setError(null);
       
-      // Update storage
-      await batchJobService.updateJob(updatedJob);
-      
       // Update local state immediately for better UX
       setBatchJobs(prev => prev.map(job => 
         job.id === updatedJob.id 
@@ -106,11 +103,16 @@ export const useBatchJobs = () => {
           : job
       ));
       
+      // Update storage
+      await batchJobService.updateJob(updatedJob);
+      
       logger.info('[USE BATCH JOBS] Job updated successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update job';
       logger.error('[USE BATCH JOBS] Error updating job:', error);
       setError(errorMessage);
+      // Revert on error
+      await loadJobs();
     }
   };
 
