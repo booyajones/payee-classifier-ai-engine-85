@@ -64,9 +64,13 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   }, [toast]);
 
   const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[] = []) => {
-    logger.info(`[BATCH FORM] Handling batch job creation: ${batchJob.id}`);
+    logger.info(`[BATCH FORM] === HANDLING BATCH JOB CREATION ===`);
+    logger.info(`[BATCH FORM] Received batch job: ${batchJob.id.slice(-8)}`);
+    logger.info(`[BATCH FORM] Payee count: ${payeeNames.length}`);
+    logger.info(`[BATCH FORM] Original data count: ${originalFileData.length}`);
     
     if (!isApiKeyValid) {
+      logger.error('[BATCH FORM] API key not valid, rejecting batch job creation');
       toast({
         title: "API Key Required",
         description: "Please set a valid OpenAI API key before creating batch jobs.",
@@ -76,24 +80,34 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     }
     
     try {
-      // This will immediately show the job in the UI
+      logger.info('[BATCH FORM] Calling addJob to add to UI...');
+      
+      // This should immediately show the job in the UI
       await addJob(batchJob, payeeNames, originalFileData);
+      
+      logger.info('[BATCH FORM] ✅ Job successfully added to UI');
       
       toast({
         title: "Success!",
-        description: `Batch job ${batchJob.id.slice(-8)} added to your jobs list.`,
+        description: `Batch job ${batchJob.id.slice(-8)} added to your jobs list and will begin processing.`,
       });
       
       storageService.cleanup();
       
     } catch (error) {
-      logger.error('[BATCH FORM] Error adding batch job:', error);
+      logger.error('[BATCH FORM] ❌ Error adding batch job to UI:', {
+        error: error instanceof Error ? error.message : String(error),
+        jobId: batchJob.id.slice(-8)
+      });
+      
       toast({
         title: "Failed to Save Batch Job",
-        description: error instanceof Error ? error.message : "Unknown error occurred.",
+        description: error instanceof Error ? error.message : "Unknown error occurred while saving the job.",
         variant: "destructive"
       });
     }
+    
+    logger.info('[BATCH FORM] === BATCH JOB CREATION HANDLING COMPLETED ===');
   };
 
   const handleJobComplete = async (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => {
