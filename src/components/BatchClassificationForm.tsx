@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -27,7 +28,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
   const { toast } = useToast();
-  const { addJob } = useBatchJobs();
+  const { addJob, refreshJobs } = useBatchJobs();
 
   useEffect(() => {
     const checkApiKey = async () => {
@@ -87,9 +88,19 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       
       logger.info('[BATCH FORM] ✅ Job successfully added to UI');
       
+      // Auto-refresh the jobs list to ensure the job appears
+      logger.info('[BATCH FORM] Auto-refreshing jobs list...');
+      try {
+        await refreshJobs();
+        logger.info('[BATCH FORM] ✅ Auto-refresh completed successfully');
+      } catch (refreshError) {
+        logger.error('[BATCH FORM] Auto-refresh failed, but job was created:', refreshError);
+        // Don't show error to user since the job was still created successfully
+      }
+      
       toast({
         title: "Success!",
-        description: `Batch job ${batchJob.id.slice(-8)} added to your jobs list and will begin processing.`,
+        description: `Batch job ${batchJob.id.slice(-8)} created and added to your jobs list!`,
       });
       
       storageService.cleanup();

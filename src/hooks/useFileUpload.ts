@@ -108,10 +108,10 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       // Show success feedback
       toast({
         title: "Batch Job Created Successfully",
-        description: `Job ${batchJob.id.slice(-8)} created and added to your list!`,
+        description: `Job ${batchJob.id.slice(-8)} is being added to your list...`,
       });
 
-      // Call the callback to add to UI - this is critical!
+      // Call the callback to add to UI - this will auto-refresh
       logger.info('[FILE UPLOAD] Calling onBatchJobCreated callback...');
       await onBatchJobCreated(
         batchJob,
