@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -90,7 +89,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       
       // Show immediate feedback
       toast({
-        title: "Creating Batch Job",
+        title: "Adding Batch Job",
         description: `Adding job ${batchJob.id.slice(-8)} to your jobs list...`,
       });
       
@@ -111,8 +110,17 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
       logger.error('[BATCH FORM] Error adding batch job:', error);
       toast({
         title: "Failed to Save Batch Job",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        description: error instanceof Error ? error.message : "Unknown error occurred. Check console for details.",
         variant: "destructive"
+      });
+      
+      // Log additional debugging info
+      logger.error('[BATCH FORM] Additional error context:', {
+        batchJobId: batchJob?.id,
+        payeeCount: payeeNames?.length,
+        dataCount: originalFileData?.length,
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error)
       });
     }
   };
