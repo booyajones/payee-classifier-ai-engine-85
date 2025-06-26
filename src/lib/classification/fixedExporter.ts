@@ -3,7 +3,7 @@ import { BatchProcessingResult, PayeeClassification } from '../types';
 
 /**
  * Fixed exporter that ensures perfect 1:1 alignment with original data
- * Now handles cases where original data wasn't preserved for large files
+ * Always preserves original data regardless of file size
  */
 export function exportResultsFixed(
   batchResult: BatchProcessingResult,
@@ -15,31 +15,22 @@ export function exportResultsFixed(
     throw new Error('Missing results data for export');
   }
   
-  const hasOriginalData = batchResult.originalFileData && batchResult.originalFileData.length > 0;
-  const isLargeFileExport = !hasOriginalData && batchResult.results.length > 1000;
-  
-  if (isLargeFileExport) {
-    console.log('[FIXED EXPORTER] Large file export mode - original data not preserved');
-    return exportLargeFileResults(batchResult.results);
-  }
-  
-  if (!hasOriginalData) {
-    console.log('[FIXED EXPORTER] No original data - using results-only export');
-    return exportResultsOnly(batchResult.results);
+  if (!batchResult.originalFileData || batchResult.originalFileData.length === 0) {
+    throw new Error('Missing original file data. Original data should always be preserved regardless of file size.');
   }
   
   if (batchResult.originalFileData.length !== batchResult.results.length) {
     throw new Error(`Data length mismatch: ${batchResult.originalFileData.length} original vs ${batchResult.results.length} results`);
   }
   
-  console.log('[FIXED EXPORTER] Full data export with original file structure');
+  console.log(`[FIXED EXPORTER] Full data export with original file structure for ${batchResult.results.length} rows`);
   const exportData: any[] = [];
   
   for (let i = 0; i < batchResult.originalFileData.length; i++) {
     const originalRow = batchResult.originalFileData[i];
     const result = batchResult.results[i];
     
-    // Validate alignment
+    // Validate perfect alignment
     if (result.rowIndex !== undefined && result.rowIndex !== i) {
       throw new Error(`Index mismatch at row ${i}: expected ${i}, got ${result.rowIndex}`);
     }
@@ -59,33 +50,49 @@ export function exportResultsFixed(
     if (result.result.processingTier === 'Excluded') {
       exportRow['Keyword_Excluded'] = 'YES';
       exportRow['Exclusion_Reason'] = result.result.reasoning;
+      exportRow['Matched_Keywords'] = result.result.keywordExclusion?.matchedKeywords?.join('; ') || '';
     } else {
       exportRow['Keyword_Excluded'] = 'NO';
       exportRow['Exclusion_Reason'] = 'Not excluded by keywords';
+      exportRow['Matched_Keywords'] = '';
     }
     
     // Add processing timestamp
     exportRow['Processed_At'] = result.timestamp.toISOString();
+    exportRow['Data_Source'] = 'Full File Processing (original structure preserved)';
     
     exportData.push(exportRow);
   }
   
-  console.log(`[FIXED EXPORTER] Successfully exported ${exportData.length} rows with perfect alignment`);
+  console.log(`[FIXED EXPORTER] Successfully exported ${exportData.length} rows with perfect alignment and full data preservation`);
   return exportData;
 }
 
 /**
- * Export function for large files where original data wasn't preserved
+ * Alternative export function that accepts classifications directly
+ * This is a fallback that should rarely be used since we always preserve original data
  */
-function exportLargeFileResults(results: PayeeClassification[]): any[] {
-  console.log(`[FIXED EXPORTER] Large file export - ${results.length} results without original data`);
+export function exportResultsFromClassifications(
+  classifications: PayeeClassification[],
+  summary: BatchProcessingResult
+): any[] {
+  if (summary.originalFileData && summary.originalFileData.length > 0) {
+    // Use the main export function when original data is available
+    return exportResultsFixed(summary, true);
+  }
   
-  return results.map((result, index) => {
+  console.warn('[FIXED EXPORTER] Fallback export mode - this should not happen in normal operation');
+  
+  return classifications.map((result, index) => {
     const exportRow: any = {};
     
-    // Add core payee information
-    exportRow['Row_Number'] = index + 1;
-    exportRow['Payee_Name'] = result.payeeName;
+    // Add from original data if available in the result
+    if (result.originalData && Object.keys(result.originalData).length > 0) {
+      Object.assign(exportRow, result.originalData);
+    } else {
+      exportRow['Row_Number'] = index + 1;
+      exportRow['Payee_Name'] = result.payeeName;
+    }
     
     // Add classification results
     exportRow['AI_Classification'] = result.result.classification;
@@ -105,60 +112,10 @@ function exportLargeFileResults(results: PayeeClassification[]): any[] {
       exportRow['Matched_Keywords'] = '';
     }
     
-    // Add processing details
-    exportRow['Processed_At'] = result.timestamp.toISOString();
-    exportRow['Data_Source'] = 'Large File Processing (original structure not preserved)';
-    
-    return exportRow;
-  });
-}
-
-/**
- * Export function for when no original data is available (fallback)
- */
-function exportResultsOnly(results: PayeeClassification[]): any[] {
-  console.log(`[FIXED EXPORTER] Results-only export - ${results.length} results`);
-  
-  return results.map((result, index) => {
-    const exportRow: any = {};
-    
-    // Add from original data if available
-    if (result.originalData && Object.keys(result.originalData).length > 0) {
-      Object.assign(exportRow, result.originalData);
-    } else {
-      exportRow['Row_Number'] = index + 1;
-      exportRow['Payee_Name'] = result.payeeName;
-    }
-    
-    // Add classification results
-    exportRow['AI_Classification'] = result.result.classification;
-    exportRow['AI_Confidence'] = `${result.result.confidence}%`;
-    exportRow['AI_Reasoning'] = result.result.reasoning;
-    exportRow['Processing_Method'] = result.result.processingMethod || 'OpenAI Batch API';
-    exportRow['Processing_Tier'] = result.result.processingTier;
-    
-    // Add keyword exclusion details
-    if (result.result.processingTier === 'Excluded') {
-      exportRow['Keyword_Excluded'] = 'YES';
-      exportRow['Exclusion_Reason'] = result.result.reasoning;
-    } else {
-      exportRow['Keyword_Excluded'] = 'NO';
-      exportRow['Exclusion_Reason'] = 'Not excluded by keywords';
-    }
-    
     // Add processing timestamp
     exportRow['Processed_At'] = result.timestamp.toISOString();
+    exportRow['Data_Source'] = 'Fallback Export (original data not preserved - should not happen)';
     
     return exportRow;
   });
-}
-
-/**
- * Alternative export function that accepts classifications directly
- */
-export function exportResultsFromClassifications(
-  classifications: PayeeClassification[],
-  summary: BatchProcessingResult
-): any[] {
-  return exportResultsFixed(summary, true);
 }

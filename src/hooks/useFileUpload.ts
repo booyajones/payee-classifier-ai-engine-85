@@ -21,7 +21,8 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       hasPayeeNames: !!validationResult?.payeeNames,
       payeeCount: validationResult?.payeeNames?.length || 0,
       selectedColumn,
-      hasOriginalData: !!validationResult?.originalData
+      hasOriginalData: !!validationResult?.originalData,
+      originalDataLength: validationResult?.originalData?.length || 0
     });
     
     // Validate inputs first
@@ -42,6 +43,30 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       toast({
         title: "No Data Found",
         description: "No payee names found in the selected column.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Ensure original data is always preserved
+    if (!validationResult.originalData || validationResult.originalData.length === 0) {
+      const error = "Original file data missing - this should never happen";
+      logger.error('[FILE UPLOAD] Original data missing:', error);
+      toast({
+        title: "Data Preservation Error",
+        description: "Original file data is missing. Please re-upload your file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Verify data alignment
+    if (validationResult.originalData.length !== validationResult.payeeNames.length) {
+      const error = `Data alignment error: ${validationResult.originalData.length} original rows vs ${validationResult.payeeNames.length} payee names`;
+      logger.error('[FILE UPLOAD] Data alignment error:', error);
+      toast({
+        title: "Data Alignment Error",
+        description: error,
         variant: "destructive",
       });
       return;
@@ -74,7 +99,7 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       // Show immediate feedback
       toast({
         title: "Creating Batch Job",
-        description: `Preparing to process ${validationResult.payeeNames.length} payees...`,
+        description: `Preparing to process ${validationResult.payeeNames.length} payees with full data preservation...`,
       });
 
       logger.info('[FILE UPLOAD] Importing createBatchJob function...');
@@ -82,6 +107,7 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       
       logger.info('[FILE UPLOAD] Calling createBatchJob with:', {
         payeeCount: validationResult.payeeNames.length,
+        originalDataCount: validationResult.originalData.length,
         description: `Payee classification for ${validationResult.payeeNames.length} payees from ${selectedColumn} column`
       });
 
@@ -108,23 +134,24 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       // Show success feedback
       toast({
         title: "Batch Job Created Successfully",
-        description: `Job ${batchJob.id.slice(-8)} is being added to your list...`,
+        description: `Job ${batchJob.id.slice(-8)} is being added to your list with full data preservation...`,
       });
 
       // Call the callback to add to UI - this will auto-refresh
-      logger.info('[FILE UPLOAD] Calling onBatchJobCreated callback...');
+      logger.info('[FILE UPLOAD] Calling onBatchJobCreated callback with preserved original data...');
       await onBatchJobCreated(
         batchJob,
         validationResult.payeeNames,
-        validationResult.originalData || []
+        validationResult.originalData // Always pass the complete original data
       );
-      logger.info('[FILE UPLOAD] ✅ onBatchJobCreated callback completed successfully');
+      logger.info('[FILE UPLOAD] ✅ onBatchJobCreated callback completed successfully with data preservation');
       
     } catch (error) {
       logger.error('[FILE UPLOAD] ❌ Batch job creation failed:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         payeeCount: validationResult.payeeNames?.length,
+        originalDataCount: validationResult.originalData?.length,
         selectedColumn
       });
       

@@ -60,38 +60,38 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
-      // Check if we have original data alignment or if it was stripped for large files
+      // Always preserve original data - no arbitrary size limits
       const hasOriginalData = originalFileData.length > 0;
-      const isLargeFile = payeeNames.length > 1000; // Threshold for large files
       
-      if (!hasOriginalData && isLargeFile) {
-        console.log(`[BATCH MANAGER] Large file detected (${payeeNames.length} rows) - original data was not preserved to save memory`);
-        toast({
-          title: "Large File Processing",
-          description: `Processing large file with ${payeeNames.length} payees. Original data structure wasn't preserved, but all classifications will be available.`,
-        });
-      } else if (!hasOriginalData) {
+      if (!hasOriginalData) {
         console.error(`[BATCH MANAGER] CRITICAL: No original data found for job with ${payeeNames.length} payees`);
-        throw new Error(`No original file data found. Cannot safely merge results.`);
+        throw new Error(`No original file data found. Cannot safely merge results. Original data should always be preserved regardless of file size.`);
       }
 
-      // Create sequential row indexes
+      // Verify data alignment
+      if (originalFileData.length !== payeeNames.length) {
+        console.error(`[BATCH MANAGER] Data length mismatch: ${originalFileData.length} original vs ${payeeNames.length} payees`);
+        throw new Error(`Data alignment error: ${originalFileData.length} original rows vs ${payeeNames.length} payee names`);
+      }
+
+      // Create sequential row indexes with perfect 1:1 correspondence
       const originalRowIndexes = Array.from({ length: payeeNames.length }, (_, i) => i);
 
       // Get raw results from OpenAI with guaranteed index alignment
       const rawResults = await downloadResultsWithRetry(latestJob, payeeNames, originalRowIndexes);
       
-      console.log(`[BATCH MANAGER] Processing ${rawResults.length} results`);
+      console.log(`[BATCH MANAGER] Processing ${rawResults.length} results with perfect alignment`);
       
       // Process results maintaining exact 1:1 correspondence
       const classifications = payeeNames.map((name, arrayIndex) => {
         const rawResult = rawResults[arrayIndex];
         const originalRowIndex = arrayIndex; // Perfect 1:1 correspondence
+        const originalRowData = originalFileData[arrayIndex];
         
-        // For large files without original data, create a minimal row structure
-        const originalRowData = hasOriginalData 
-          ? (originalFileData[arrayIndex] || {})
-          : { payee_name: name }; // Fallback structure for large files
+        if (!originalRowData) {
+          console.error(`[BATCH MANAGER] Missing original data for index ${arrayIndex}`);
+          throw new Error(`Missing original data for row ${arrayIndex}. Data integrity compromised.`);
+        }
         
         console.log(`[BATCH MANAGER] Processing row ${arrayIndex}: "${name}"`);
         
@@ -139,25 +139,21 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       ).length;
       const failureCount = classifications.length - successCount;
 
-      console.log(`[BATCH MANAGER] Creating summary for ${classifications.length} classifications`);
+      console.log(`[BATCH MANAGER] Creating summary for ${classifications.length} classifications with full data preservation`);
 
-      // Create the summary with appropriate original data
+      // Create the summary with complete original data preservation
       const summary: BatchProcessingResult = {
         results: classifications,
         successCount,
         failureCount,
-        originalFileData: hasOriginalData ? originalFileData : [] // Empty for large files
+        originalFileData: originalFileData // Always preserve original data
       };
 
       onJobComplete(classifications, summary, job.id);
 
-      const dataPreservationNote = hasOriginalData 
-        ? "with full original data structure preserved"
-        : "(original spreadsheet structure not preserved due to file size, but all classifications available)";
-
       toast({
         title: "Results Downloaded Successfully", 
-        description: `Downloaded ${successCount} successful classifications${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''} ${dataPreservationNote}.`,
+        description: `Downloaded ${successCount} successful classifications${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''} with full original data structure preserved.`,
       });
     } catch (error) {
       const appError = handleError(error, 'Results Download');
