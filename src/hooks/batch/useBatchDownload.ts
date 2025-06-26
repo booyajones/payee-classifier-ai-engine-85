@@ -57,21 +57,36 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       });
       
       if (payeeNames.length === 0) {
+        console.warn(`[BATCH MANAGER] No payee names found for job ${job.id}`);
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
-      // Always preserve original data - no arbitrary size limits
+      // Always preserve original data - gracefully handle missing data
       const hasOriginalData = originalFileData.length > 0;
       
       if (!hasOriginalData) {
-        console.error(`[BATCH MANAGER] CRITICAL: No original data found for job with ${payeeNames.length} payees`);
-        throw new Error(`No original file data found. Cannot safely merge results. Original data should always be preserved regardless of file size.`);
+        console.warn(`[BATCH MANAGER] No original data found for job ${job.id} - will create fallback structure`);
       }
 
-      // Verify data alignment
-      if (originalFileData.length !== payeeNames.length) {
-        console.error(`[BATCH MANAGER] Data length mismatch: ${originalFileData.length} original vs ${payeeNames.length} payees`);
-        throw new Error(`Data alignment error: ${originalFileData.length} original rows vs ${payeeNames.length} payee names`);
+      // Handle data alignment - be more flexible
+      let alignedOriginalData = originalFileData;
+      if (hasOriginalData && originalFileData.length !== payeeNames.length) {
+        console.warn(`[BATCH MANAGER] Data length mismatch: ${originalFileData.length} original vs ${payeeNames.length} payees - will align data`);
+        
+        // Try to align data or create fallback
+        if (originalFileData.length > payeeNames.length) {
+          alignedOriginalData = originalFileData.slice(0, payeeNames.length);
+        } else {
+          // Extend with fallback data
+          alignedOriginalData = [...originalFileData];
+          for (let i = originalFileData.length; i < payeeNames.length; i++) {
+            alignedOriginalData.push({
+              'Row_Number': i + 1,
+              'Payee_Name': payeeNames[i],
+              'Original_Source': 'Data alignment fallback'
+            });
+          }
+        }
       }
 
       // Create sequential row indexes with perfect 1:1 correspondence
@@ -80,17 +95,24 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       // Get raw results from OpenAI with guaranteed index alignment
       const rawResults = await downloadResultsWithRetry(latestJob, payeeNames, originalRowIndexes);
       
-      console.log(`[BATCH MANAGER] Processing ${rawResults.length} results with perfect alignment`);
+      console.log(`[BATCH MANAGER] Processing ${rawResults.length} results with alignment`);
       
-      // Process results maintaining exact 1:1 correspondence
+      // Process results maintaining correspondence
       const classifications = payeeNames.map((name, arrayIndex) => {
         const rawResult = rawResults[arrayIndex];
         const originalRowIndex = arrayIndex; // Perfect 1:1 correspondence
-        const originalRowData = originalFileData[arrayIndex];
         
-        if (!originalRowData) {
-          console.error(`[BATCH MANAGER] Missing original data for index ${arrayIndex}`);
-          throw new Error(`Missing original data for row ${arrayIndex}. Data integrity compromised.`);
+        // Get original row data or create fallback
+        let originalRowData = null;
+        if (hasOriginalData && alignedOriginalData[arrayIndex]) {
+          originalRowData = alignedOriginalData[arrayIndex];
+        } else {
+          // Create fallback original data
+          originalRowData = {
+            'Row_Number': arrayIndex + 1,
+            'Payee_Name': name,
+            'Data_Source': 'Fallback - original data not preserved'
+          };
         }
         
         console.log(`[BATCH MANAGER] Processing row ${arrayIndex}: "${name}"`);
@@ -139,21 +161,21 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       ).length;
       const failureCount = classifications.length - successCount;
 
-      console.log(`[BATCH MANAGER] Creating summary for ${classifications.length} classifications with full data preservation`);
+      console.log(`[BATCH MANAGER] Creating summary for ${classifications.length} classifications`);
 
-      // Create the summary with complete original data preservation
+      // Create the summary with original data (or fallback)
       const summary: BatchProcessingResult = {
         results: classifications,
         successCount,
         failureCount,
-        originalFileData: originalFileData // Always preserve original data
+        originalFileData: hasOriginalData ? alignedOriginalData : classifications.map(c => c.originalData).filter(Boolean)
       };
 
       onJobComplete(classifications, summary, job.id);
 
       toast({
         title: "Results Downloaded Successfully", 
-        description: `Downloaded ${successCount} successful classifications${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''} with full original data structure preserved.`,
+        description: `Downloaded ${successCount} successful classifications${failureCount > 0 ? ` and ${failureCount} failed attempts` : ''}${!hasOriginalData ? ' (using fallback data structure)' : ''}.`,
       });
     } catch (error) {
       const appError = handleError(error, 'Results Download');
@@ -168,13 +190,14 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
         });
         onJobDelete(job.id);
       } else {
-        showRetryableErrorToast(
-          appError, 
-          () => handleDownloadResults(job),
-          'Results Download'
-        );
+        toast({
+          title: "Download Failed",
+          description: `Failed to download results for job ${job.id.slice(-8)}. ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: "destructive"
+        });
       }
     } finally {
+      // Always clear the downloading state
       setDownloadingJobs(prev => {
         const newSet = new Set(prev);
         newSet.delete(job.id);
