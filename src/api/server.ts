@@ -7,7 +7,9 @@ export interface BatchProgress {
   queued: number;
   running: number;
   failed: number;
-  eta: number | null;
+  low_confidence: number;
+  duplicates_found: number;
+  eta_seconds: number | null;
 }
 
 const DEFAULT_STATUS: BatchProgress = {
@@ -16,7 +18,9 @@ const DEFAULT_STATUS: BatchProgress = {
   queued: 0,
   running: 0,
   failed: 0,
-  eta: null
+  low_confidence: 0,
+  duplicates_found: 0,
+  eta_seconds: null
 };
 
 const batchStatuses: Map<string, BatchProgress> = new Map();

@@ -24,7 +24,9 @@ export interface ProcessingJob {
   queued?: number;
   running?: number;
   failed?: number;
-  eta?: number | null;
+  lowConfidence?: number;
+  duplicatesFound?: number;
+  etaSeconds?: number | null;
   statusUrl?: string;
   progressUrl?: string;
 }
@@ -81,8 +83,10 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           queued: data.queued,
           running: data.running,
           failed: data.failed,
-          estimatedTimeRemaining: data.eta ?? undefined,
-          eta: data.eta,
+          lowConfidence: data.low_confidence,
+          duplicatesFound: data.duplicates_found,
+          estimatedTimeRemaining: data.eta_seconds ?? undefined,
+          etaSeconds: data.eta_seconds,
           status
         });
 
