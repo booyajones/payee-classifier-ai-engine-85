@@ -1,6 +1,4 @@
-import { ClassificationResult } from '../types';
-import { LEGAL_SUFFIXES, BUSINESS_KEYWORDS, INDUSTRY_IDENTIFIERS, GOVERNMENT_PATTERNS, PROFESSIONAL_TITLES } from './config';
-import { probablepeople } from './probablepeople';
+import { logger } from '../logger';
 
 /**
  * Rule-based classification using probablepeople library and custom rules
@@ -28,7 +26,7 @@ export async function applyRuleBasedClassification(payeeName: string): Promise<C
     }
   } catch (error) {
     // Parsing failed, continue with other rules
-    console.log("Probablepeople parsing failed, using fallback rules");
+    logger.info("Probablepeople parsing failed, using fallback rules");
   }
 
   // Check for legal suffixes

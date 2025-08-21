@@ -1,10 +1,4 @@
-import { ClassificationResult, ClassificationConfig } from '../types';
-import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
-import { applyRuleBasedClassification } from './ruleBasedClassification';
-import { applyNLPClassification } from './nlpClassification';
-import { enhancedClassifyPayeeWithAI, consensusClassification } from '../openai/enhancedClassification';
-import { detectBusinessByExtendedRules, detectIndividualByExtendedRules, normalizeText } from './enhancedRules';
-import { checkKeywordExclusion } from './enhancedKeywordExclusion';
+import { logger } from '../logger';
 
 /**
  * Enhanced classification function V2 with improved keyword exclusion handling
@@ -90,7 +84,7 @@ export async function enhancedClassifyPayeeV2(
         keywordExclusion: exclusionResult
       };
     } catch (error) {
-      console.error("Error with AI classification:", error);
+      logger.error("Error with AI classification:", error);
       // Fall through to rule-based backup
     }
   }
@@ -127,7 +121,7 @@ export async function enhancedClassifyPayeeV2(
       keywordExclusion: exclusionResult
     };
   } catch (error) {
-    console.error("Error with consensus classification:", error);
+    logger.error("Error with consensus classification:", error);
     
     // Fallback to single AI classification
     try {
@@ -141,7 +135,7 @@ export async function enhancedClassifyPayeeV2(
         keywordExclusion: exclusionResult
       };
     } catch (innerError) {
-      console.error("Error with enhanced AI classification:", innerError);
+      logger.error("Error with enhanced AI classification:", innerError);
       
       // Last resort: basic heuristic
       return {

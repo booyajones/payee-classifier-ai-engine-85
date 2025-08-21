@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { ClassificationResult } from '../types';
 import { classifyPayeeWithAI } from '../openai/singleClassification';
@@ -10,7 +11,7 @@ export async function classifyPayee(
   payeeName: string,
   useEnhanced: boolean = false
 ): Promise<ClassificationResult> {
-  console.log(`Classifying "${payeeName}" with real OpenAI API (enhanced: ${useEnhanced})`);
+  logger.info(`Classifying "${payeeName}" with real OpenAI API (enhanced: ${useEnhanced})`);
   
   try {
     if (useEnhanced) {
@@ -34,7 +35,7 @@ export async function classifyPayee(
       };
     }
   } catch (error) {
-    console.error(`Error classifying ${payeeName}:`, error);
+    logger.error(`Error classifying ${payeeName}:`, error);
     throw error;
   }
 }

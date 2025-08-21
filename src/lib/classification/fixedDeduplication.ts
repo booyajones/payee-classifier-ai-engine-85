@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { PayeeClassification } from '../types';
 
@@ -15,12 +16,12 @@ export function processPayeeDeduplicationFixed(
   const exactDuplicates = new Map<string, number>();
   const seenNames = new Map<string, number>(); // Map normalized name to first occurrence index
 
-  console.log(`[FIXED DEDUP] Processing ${payeeNames.length} payee names for exact duplicates only`);
+  logger.info(`[FIXED DEDUP] Processing ${payeeNames.length} payee names for exact duplicates only`);
 
   for (let i = 0; i < payeeNames.length; i++) {
     const name = payeeNames[i]?.trim();
     if (!name) {
-      console.warn(`[FIXED DEDUP] Empty name at index ${i}, skipping`);
+      logger.warn(`[FIXED DEDUP] Empty name at index ${i}, skipping`);
       continue;
     }
 
@@ -30,7 +31,7 @@ export function processPayeeDeduplicationFixed(
     if (seenNames.has(normalizedName)) {
       const firstIndex = seenNames.get(normalizedName)!;
       exactDuplicates.set(`${i}`, firstIndex);
-      console.log(`[FIXED DEDUP] Exact duplicate found: "${name}" at index ${i} matches first occurrence at index ${firstIndex}`);
+      logger.info(`[FIXED DEDUP] Exact duplicate found: "${name}" at index ${i} matches first occurrence at index ${firstIndex}`);
     } else {
       // First occurrence of this name
       seenNames.set(normalizedName, i);
@@ -42,7 +43,7 @@ export function processPayeeDeduplicationFixed(
     }
   }
 
-  console.log(`[FIXED DEDUP] Result: ${processQueue.length} unique names to process, ${exactDuplicates.size} exact duplicates found`);
+  logger.info(`[FIXED DEDUP] Result: ${processQueue.length} unique names to process, ${exactDuplicates.size} exact duplicates found`);
   
   return { processQueue, exactDuplicates };
 }
@@ -76,7 +77,7 @@ export function createDuplicateResults(
       };
       
       duplicateResults.push(duplicateResult);
-      console.log(`[FIXED DEDUP] Created duplicate result for index ${duplicateIndex} based on original at ${originalIndex}`);
+      logger.info(`[FIXED DEDUP] Created duplicate result for index ${duplicateIndex} based on original at ${originalIndex}`);
     }
   }
   

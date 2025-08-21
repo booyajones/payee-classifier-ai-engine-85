@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
 import { balancedClassifyPayeeWithAI } from '../openai/balancedClassification';
@@ -14,19 +15,19 @@ export async function fixedProcessBatch(
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   
-  console.log(`[FIXED BATCH] Starting batch processing of ${payeeNames.length} payees`);
-  console.log(`[FIXED BATCH] Original file data length: ${originalFileData?.length || 0}`);
+  logger.info(`[FIXED BATCH] Starting batch processing of ${payeeNames.length} payees`);
+  logger.info(`[FIXED BATCH] Original file data length: ${originalFileData?.length || 0}`);
   
   // Validate input alignment
   if (originalFileData && originalFileData.length !== payeeNames.length) {
-    console.error(`[FIXED BATCH] CRITICAL: Data misalignment detected! PayeeNames: ${payeeNames.length}, OriginalData: ${originalFileData.length}`);
+    logger.error(`[FIXED BATCH] CRITICAL: Data misalignment detected! PayeeNames: ${payeeNames.length}, OriginalData: ${originalFileData.length}`);
     throw new Error(`Data alignment error: ${payeeNames.length} names vs ${originalFileData.length} data rows`);
   }
   
   // Process deduplication to find exact duplicates only
   const { processQueue, exactDuplicates } = processPayeeDeduplicationFixed(payeeNames, originalFileData);
   
-  console.log(`[FIXED BATCH] Processing ${processQueue.length} unique names, ${exactDuplicates.size} exact duplicates`);
+  logger.info(`[FIXED BATCH] Processing ${processQueue.length} unique names, ${exactDuplicates.size} exact duplicates`);
   
   // Process unique names only
   const results: PayeeClassification[] = [];
@@ -35,7 +36,7 @@ export async function fixedProcessBatch(
   
   for (let i = 0; i < processQueue.length; i += batchSize) {
     const batch = processQueue.slice(i, i + batchSize);
-    console.log(`[FIXED BATCH] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(processQueue.length / batchSize)}`);
+    logger.info(`[FIXED BATCH] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(processQueue.length / batchSize)}`);
     
     const batchPromises = batch.map(async (item) => {
       try {
@@ -59,13 +60,13 @@ export async function fixedProcessBatch(
         
         processedCount++;
         if (processedCount % 10 === 0) {
-          console.log(`[FIXED BATCH] Progress: ${processedCount}/${processQueue.length} unique names processed`);
+          logger.info(`[FIXED BATCH] Progress: ${processedCount}/${processQueue.length} unique names processed`);
         }
         
         return payeeClassification;
         
       } catch (error) {
-        console.error(`[FIXED BATCH] Error processing "${item.name}" at index ${item.originalIndex}:`, error);
+        logger.error(`[FIXED BATCH] Error processing "${item.name}" at index ${item.originalIndex}:`, error);
         
         // Create fallback result - no failures allowed
         return {
@@ -105,7 +106,7 @@ export async function fixedProcessBatch(
   
   // Final validation
   if (allResults.length !== payeeNames.length) {
-    console.error(`[FIXED BATCH] CRITICAL: Result count mismatch! Expected: ${payeeNames.length}, Got: ${allResults.length}`);
+    logger.error(`[FIXED BATCH] CRITICAL: Result count mismatch! Expected: ${payeeNames.length}, Got: ${allResults.length}`);
     throw new Error(`Result alignment error: Expected ${payeeNames.length} results, got ${allResults.length}`);
   }
   
@@ -113,10 +114,10 @@ export async function fixedProcessBatch(
   for (let i = 0; i < allResults.length; i++) {
     const result = allResults[i];
     if (result.rowIndex !== i) {
-      console.error(`[FIXED BATCH] CRITICAL: Index mismatch at position ${i}, result has rowIndex ${result.rowIndex}`);
+      logger.error(`[FIXED BATCH] CRITICAL: Index mismatch at position ${i}, result has rowIndex ${result.rowIndex}`);
     }
     if (result.payeeName !== payeeNames[i]) {
-      console.warn(`[FIXED BATCH] Name mismatch at index ${i}: expected "${payeeNames[i]}", got "${result.payeeName}"`);
+      logger.warn(`[FIXED BATCH] Name mismatch at index ${i}: expected "${payeeNames[i]}", got "${result.payeeName}"`);
     }
   }
   
@@ -127,11 +128,11 @@ export async function fixedProcessBatch(
   const individualCount = allResults.filter(r => r.result.classification === 'Individual').length;
   const averageConfidence = allResults.reduce((sum, r) => sum + r.result.confidence, 0) / allResults.length;
   
-  console.log(`[FIXED BATCH] Completed: ${allResults.length} total results`);
-  console.log(`[FIXED BATCH] Classification breakdown: ${businessCount} Business, ${individualCount} Individual`);
-  console.log(`[FIXED BATCH] Business rate: ${((businessCount / allResults.length) * 100).toFixed(1)}%`);
-  console.log(`[FIXED BATCH] Average confidence: ${averageConfidence.toFixed(1)}%`);
-  console.log(`[FIXED BATCH] Processing time: ${processingTime}ms`);
+  logger.info(`[FIXED BATCH] Completed: ${allResults.length} total results`);
+  logger.info(`[FIXED BATCH] Classification breakdown: ${businessCount} Business, ${individualCount} Individual`);
+  logger.info(`[FIXED BATCH] Business rate: ${((businessCount / allResults.length) * 100).toFixed(1)}%`);
+  logger.info(`[FIXED BATCH] Average confidence: ${averageConfidence.toFixed(1)}%`);
+  logger.info(`[FIXED BATCH] Processing time: ${processingTime}ms`);
   
   return {
     results: allResults,

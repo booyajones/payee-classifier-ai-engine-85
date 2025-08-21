@@ -1,3 +1,4 @@
+import { logger } from '../../logger';
 
 import { ExportRow, ExportContext } from './types';
 
@@ -8,23 +9,23 @@ export function createResultsMap(results: any[]): Map<number, any> {
   const resultsMap = new Map<number, any>();
   const seenIndices = new Set<number>();
   
-  console.log('[RESULTS MERGER] Creating results map with validation');
+  logger.info('[RESULTS MERGER] Creating results map with validation');
   
   results.forEach((result, arrayIndex) => {
     const rowIndex = result.rowIndex;
     
     if (rowIndex === undefined || rowIndex === null) {
-      console.error(`[RESULTS MERGER] CRITICAL: Result at array position ${arrayIndex} has undefined rowIndex:`, result);
+      logger.error(`[RESULTS MERGER] CRITICAL: Result at array position ${arrayIndex} has undefined rowIndex:`, result);
       throw new Error(`Result at array position ${arrayIndex} missing rowIndex`);
     }
     
     if (seenIndices.has(rowIndex)) {
-      console.error(`[RESULTS MERGER] CRITICAL: Duplicate rowIndex ${rowIndex} found`);
+      logger.error(`[RESULTS MERGER] CRITICAL: Duplicate rowIndex ${rowIndex} found`);
       throw new Error(`Duplicate rowIndex ${rowIndex} detected in results`);
     }
     
     if (rowIndex !== arrayIndex) {
-      console.error(`[RESULTS MERGER] CRITICAL: Index mismatch - array position ${arrayIndex} has rowIndex ${rowIndex}`);
+      logger.error(`[RESULTS MERGER] CRITICAL: Index mismatch - array position ${arrayIndex} has rowIndex ${rowIndex}`);
       throw new Error(`Index mismatch: array position ${arrayIndex} has rowIndex ${rowIndex}`);
     }
     
@@ -32,7 +33,7 @@ export function createResultsMap(results: any[]): Map<number, any> {
     resultsMap.set(rowIndex, result);
   });
   
-  console.log(`[RESULTS MERGER] Successfully created results map with ${resultsMap.size} entries, all perfectly aligned`);
+  logger.info(`[RESULTS MERGER] Successfully created results map with ${resultsMap.size} entries, all perfectly aligned`);
   return resultsMap;
 }
 
@@ -49,17 +50,17 @@ export function mergeRowWithResult(
   const exportRow: ExportRow = includeAllColumns ? { ...originalRow } : {};
 
   if (!result) {
-    console.error(`[MERGE] CRITICAL: No result found for row ${index} - this indicates perfect alignment has failed`);
+    logger.error(`[MERGE] CRITICAL: No result found for row ${index} - this indicates perfect alignment has failed`);
     throw new Error(`Missing result for row ${index} - data alignment corrupted`);
   }
 
   // Verify perfect alignment
   if (result.rowIndex !== index) {
-    console.error(`[MERGE] CRITICAL: Alignment error - expected rowIndex ${index}, got ${result.rowIndex}`);
+    logger.error(`[MERGE] CRITICAL: Alignment error - expected rowIndex ${index}, got ${result.rowIndex}`);
     throw new Error(`Data alignment error at row ${index}: expected rowIndex ${index}, got ${result.rowIndex}`);
   }
 
-  console.log(`[MERGE] Perfect alignment confirmed for row ${index}: "${result.payeeName}"`);
+  logger.info(`[MERGE] Perfect alignment confirmed for row ${index}: "${result.payeeName}"`);
 
   // Add all AI classification data as NEW columns
   exportRow['AI_Classification'] = result.result.classification;

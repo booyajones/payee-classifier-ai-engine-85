@@ -1,10 +1,10 @@
-
 import { ClassificationResult, ClassificationConfig } from '../types';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
 import { applyRuleBasedClassification } from './ruleBasedClassification';
 import { applyNLPClassification } from './nlpClassification';
 import { enhancedClassifyPayeeWithAI, consensusClassification } from '../openai/enhancedClassification';
 import { detectBusinessByExtendedRules, detectIndividualByExtendedRules, normalizeText } from './enhancedRules';
+import { logger } from '../logger';
 
 /**
  * Enhanced classification function that implements a multi-tiered approach
@@ -74,7 +74,7 @@ export async function enhancedClassifyPayee(
         matchingRules: aiResult.matchingRules
       };
     } catch (error) {
-      console.error("Error with AI classification:", error);
+      logger.error("Error with AI classification:", error);
       // Fall through to rule-based backup
     }
   }
@@ -104,7 +104,7 @@ export async function enhancedClassifyPayee(
       matchingRules: aiResult.matchingRules
     };
   } catch (error) {
-    console.error("Error with consensus classification:", error);
+    logger.error("Error with consensus classification:", error);
     
     // Fallback to single AI classification
     try {
@@ -117,7 +117,7 @@ export async function enhancedClassifyPayee(
         matchingRules: result.matchingRules
       };
     } catch (innerError) {
-      console.error("Error with enhanced AI classification:", innerError);
+      logger.error("Error with enhanced AI classification:", innerError);
       
       // Last resort: basic heuristic
       return {

@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { ClassificationResult, ClassificationConfig, SimilarityScores } from '../types';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
@@ -183,7 +184,7 @@ async function performAdvancedFuzzyMatching(payeeName: string): Promise<Classifi
     
     return null;
   } catch (error) {
-    console.warn('Advanced fuzzy matching failed:', error);
+    logger.warn('Advanced fuzzy matching failed:', error);
     return null;
   }
 }
@@ -235,7 +236,7 @@ async function performWebSearchClassification(payeeName: string): Promise<Classi
       processingMethod: 'Web-search enhanced consensus AI'
     };
   } catch (error) {
-    console.error('Web search classification failed:', error);
+    logger.error('Web search classification failed:', error);
     
     // Fall back to multi-algorithm classification
     const fallbackResult = performMultiAlgorithmClassification(payeeName);
@@ -268,7 +269,7 @@ export async function enhancedClassifyPayeeV3(
   }
 
   try {
-    console.log(`[V3] Classifying "${payeeName}" with intelligent escalation...`);
+    logger.info(`[V3] Classifying "${payeeName}" with intelligent escalation...`);
 
     // Stage 1: Keyword exclusion check
     const keywordExclusion = checkKeywordExclusion(payeeName);
@@ -351,22 +352,22 @@ export async function enhancedClassifyPayeeV3(
         
         // If AI confidence is low, escalate to web search
         if (aiResult.confidence < CONFIDENCE_THRESHOLDS.REVIEW_REQUIRED) {
-          console.log(`[V3] Low AI confidence (${aiResult.confidence}%), escalating to web search for "${payeeName}"`);
+          logger.info(`[V3] Low AI confidence (${aiResult.confidence}%), escalating to web search for "${payeeName}"`);
           return await performWebSearchClassification(payeeName);
         }
         
       } catch (error) {
-        console.warn(`[V3] Standard AI classification failed for "${payeeName}":`, error);
+        logger.warn(`[V3] Standard AI classification failed for "${payeeName}":`, error);
         // Continue to web search escalation
       }
     }
 
     // Stage 6: Web search enhanced classification (when system needs to look harder)
-    console.log(`[V3] Escalating to web search classification for "${payeeName}"`);
+    logger.info(`[V3] Escalating to web search classification for "${payeeName}"`);
     return await performWebSearchClassification(payeeName);
 
   } catch (error) {
-    console.error(`[V3] Unexpected error classifying "${payeeName}":`, error);
+    logger.error(`[V3] Unexpected error classifying "${payeeName}":`, error);
     
     // ABSOLUTE FALLBACK - NO FAILURES ALLOWED
     const emergencyResult = performMultiAlgorithmClassification(payeeName);
