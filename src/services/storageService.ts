@@ -31,15 +31,26 @@ class UnifiedStorageService implements StorageService {
 
   getSize(): number {
     let total = 0;
-    try {
-      for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-          total += localStorage[key].length + key.length;
+    const hasLocalStorage = typeof localStorage !== 'undefined';
+
+    if (hasLocalStorage) {
+      try {
+        for (const [key, value] of Object.entries(localStorage)) {
+          if (typeof value === 'string') {
+            total += key.length + value.length;
+          }
         }
+      } catch (error) {
+        logger.error('[STORAGE] Error calculating size:', error);
       }
-    } catch (error) {
-      logger.error('[STORAGE] Error calculating size:', error);
     }
+
+    if (this._isUsingFallback || !hasLocalStorage) {
+      for (const [key, value] of Object.entries(this.memoryStorage)) {
+        total += key.length + value.length;
+      }
+    }
+
     return total;
   }
 
