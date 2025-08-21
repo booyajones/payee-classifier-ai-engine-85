@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { logger } from "@/lib/logger";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
+import { normalizePayeeName } from "@/lib/classification/nameProcessing";
 
 interface UseFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
@@ -104,11 +105,31 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
 
       logger.info('[FILE UPLOAD] Importing createBatchJob function...');
       const { createBatchJob } = await import("@/lib/openai/trueBatchAPI");
-      
+
+      // Normalize names and filter duplicates while keeping original indexes
+      const normalizedToIndex = new Map<string, number>();
+      const filteredPayees: string[] = [];
+      const originalRowIndexes: number[] = [];
+      const duplicateMap: Record<number, number[]> = {};
+
+      validationResult.payeeNames.forEach((name: string, idx: number) => {
+        const normalized = normalizePayeeName(name);
+        const existingIndex = normalizedToIndex.get(normalized);
+        if (existingIndex === undefined) {
+          const uniqueIndex = filteredPayees.length;
+          normalizedToIndex.set(normalized, uniqueIndex);
+          filteredPayees.push(name);
+          originalRowIndexes.push(idx);
+          duplicateMap[uniqueIndex] = [idx];
+        } else {
+          duplicateMap[existingIndex].push(idx);
+        }
+      });
+
       logger.info('[FILE UPLOAD] Calling createBatchJob with:', {
-        payeeCount: validationResult.payeeNames.length,
+        payeeCount: filteredPayees.length,
         originalDataCount: validationResult.originalData.length,
-        description: `Payee classification for ${validationResult.payeeNames.length} payees from ${selectedColumn} column`
+        description: `Payee classification for ${filteredPayees.length} payees from ${selectedColumn} column`
       });
 
       // Add timeout wrapper for the API call
@@ -118,11 +139,15 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
 
       const batchJob = await Promise.race([
         createBatchJob(
-          validationResult.payeeNames,
-          `Payee classification for ${validationResult.payeeNames.length} payees from ${selectedColumn} column`
+          filteredPayees,
+          `Payee classification for ${filteredPayees.length} payees from ${selectedColumn} column`,
+          originalRowIndexes
         ),
         timeoutPromise
       ]) as BatchJob;
+
+      // Preserve duplicate mapping for later reconciliation
+      const batchJobWithMap = { ...(batchJob as any), duplicateMap } as BatchJob;
       
       logger.info('[FILE UPLOAD] ✅ Batch job created successfully:', {
         id: batchJob.id,
@@ -140,8 +165,8 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       // Call the callback to add to UI - this will auto-refresh
       logger.info('[FILE UPLOAD] Calling onBatchJobCreated callback with preserved original data...');
       await onBatchJobCreated(
-        batchJob,
-        validationResult.payeeNames,
+        batchJobWithMap,
+        filteredPayees,
         validationResult.originalData // Always pass the complete original data
       );
       logger.info('[FILE UPLOAD] ✅ onBatchJobCreated callback completed successfully with data preservation');
