@@ -3,6 +3,7 @@ import { ClassificationResult } from '../types';
 import { getOpenAIClient } from './client';
 import { timeoutPromise } from './utils';
 import { logger } from '../logger';
+import { promptVersion } from '../classification/config';
 
 interface AIClassificationResponse {
   classification: 'Business' | 'Individual';
@@ -14,6 +15,7 @@ interface AIClassificationResponse {
 interface CacheEntry {
   result: AIClassificationResponse;
   timestamp: number;
+  promptVersion: string;
 }
 
 // Time to live for cached classifications (24 hours in milliseconds)
@@ -39,9 +41,10 @@ function normalizeCacheKey(payeeName: string): string {
 function saveToCache(payeeName: string, result: AIClassificationResponse): void {
   try {
     const normalizedName = normalizeCacheKey(payeeName);
-    const cacheEntry = {
+    const cacheEntry: CacheEntry = {
       result,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      promptVersion
     };
     
     // Save to in-memory cache
@@ -82,18 +85,34 @@ function getFromCache(payeeName: string): AIClassificationResponse | null {
     
     // Try in-memory cache first (fastest)
     const memoryResult = inMemoryCache.get(normalizedName);
-    if (memoryResult && Date.now() - memoryResult.timestamp < CACHE_TTL) {
+    if (
+      memoryResult &&
+      memoryResult.promptVersion === promptVersion &&
+      Date.now() - memoryResult.timestamp < CACHE_TTL
+    ) {
       return memoryResult.result;
+    }
+    if (memoryResult && memoryResult.promptVersion !== promptVersion) {
+      inMemoryCache.delete(normalizedName);
     }
     
     // Try localStorage if not in memory
     const cachedClassifications = JSON.parse(localStorage.getItem('payeeClassifications') || '{}');
     const entry = cachedClassifications[normalizedName] as CacheEntry | undefined;
-    
-    if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
-      // Update in-memory cache for faster access next time
-      inMemoryCache.set(normalizedName, entry);
-      return entry.result;
+
+    if (entry) {
+      if (
+        entry.promptVersion === promptVersion &&
+        Date.now() - entry.timestamp < CACHE_TTL
+      ) {
+        // Update in-memory cache for faster access next time
+        inMemoryCache.set(normalizedName, entry);
+        return entry.result;
+      }
+
+      // Remove outdated cache entry
+      delete cachedClassifications[normalizedName];
+      localStorage.setItem('payeeClassifications', JSON.stringify(cachedClassifications));
     }
   } catch (error) {
     logger.warn('Failed to retrieve classification from cache:', error);
@@ -113,10 +132,16 @@ function loadCacheFromStorage(): void {
     const now = Date.now();
     Object.entries(cachedClassifications).forEach(([key, entry]) => {
       const typedEntry = entry as CacheEntry;
-      if (now - typedEntry.timestamp < CACHE_TTL) {
+      if (
+        typedEntry.promptVersion === promptVersion &&
+        now - typedEntry.timestamp < CACHE_TTL
+      ) {
         inMemoryCache.set(key, typedEntry);
+      } else {
+        delete cachedClassifications[key];
       }
     });
+    localStorage.setItem('payeeClassifications', JSON.stringify(cachedClassifications));
     
     logger.info(`Loaded ${inMemoryCache.size} cached classifications from storage`);
   } catch (error) {

@@ -19,6 +19,9 @@ export const DEFAULT_CLASSIFICATION_CONFIG: ClassificationConfig = {
   useCacheForDuplicates: true // Deduplicate similar names
 };
 
+// Version identifier for AI classification prompts
+export const promptVersion = '1';
+
 // Increased concurrency limits for better parallel processing
 const envConcurrency = parseInt(getEnvVar('CLASSIFIER_MAX_CONCURRENCY', '20'), 10);
 export const MAX_CONCURRENCY =
