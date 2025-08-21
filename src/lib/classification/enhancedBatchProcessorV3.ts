@@ -1,4 +1,12 @@
 import { logger } from '../logger';
+import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
+import { DEFAULT_CLASSIFICATION_CONFIG, MAX_CONCURRENCY } from './config';
+import { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
+import { processPayeeDeduplication } from './batchDeduplication';
+import { handleBatchRetries } from './batchRetryHandler';
+import { calculateBatchStatistics, logBatchStatistics } from './batchStatistics';
+import { exportResultsWithOriginalDataV3 } from './exporters';
+import { applyRuleBasedClassification } from './ruleBasedClassification';
 
 /**
  * Enhanced V3 batch processor with no failures and intelligent processing
@@ -31,7 +39,11 @@ export async function enhancedProcessBatchV3(
     
     const batchPromises = batch.map(async (item) => {
       try {
-        const result = await enhancedClassifyPayeeV3(item.name, config);
+        const ruleResult = await applyRuleBasedClassification(item.name);
+        const result =
+          ruleResult && ruleResult.confidence >= config.aiThreshold
+            ? ruleResult
+            : await enhancedClassifyPayeeV3(item.name, config);
         
         const payeeClassification: PayeeClassification = {
           id: `payee-${item.originalIndex}`,

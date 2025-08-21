@@ -4,15 +4,14 @@ import {
   DEFAULT_API_TIMEOUT,
   CLASSIFICATION_MODEL,
   MAX_PARALLEL_BATCHES,
-  MAX_TOKENS,
-  MAX_ITEMS_PER_REQUEST
+  MAX_TOKENS
 } from './config';
 import { logger } from '../logger';
+import { classificationResponseSchema } from './schema';
 
 export const MAX_RETRIES = 2;
 export const RETRY_DELAY_BASE = 1000;
 
-const PROMPT_OVERHEAD_TOKENS = 100; // Rough estimate of system/prompt tokens
 
 interface BatchItem {
   original: string;
@@ -53,6 +52,8 @@ let persistCache = true;
 
 let cacheHits = 0;
 let cacheLookups = 0;
+
+const PROMPT_VERSION = 'v1';
 
 /**
  * Load cache from localStorage on initialization
@@ -129,14 +130,15 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Normalize name for caching
+ * Generate cache key using normalized name and prompt version
  */
-function normalizeForCache(name: string): string {
+function getCacheKey(name: string): string {
   if (!name || typeof name !== 'string') {
     logger.warn('[CACHE] Invalid name for caching:', name);
     return '';
   }
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+  const normalized = name.trim().toLowerCase().replace(/\s+/g, ' ');
+  return `${normalized}|${PROMPT_VERSION}`;
 }
 
 /**
@@ -157,24 +159,24 @@ function getCachedResult(name: string): CachedResult | null {
     return null;
   }
 
-  const normalized = normalizeForCache(name);
-  if (!normalized) {
+  const key = getCacheKey(name);
+  if (!key) {
     return null;
   }
 
   cacheLookups++;
-  const cached = classificationCache.get(normalized);
+  const cached = classificationCache.get(key);
 
   if (cached && isCacheValid(cached)) {
     cacheHits++;
     logger.info(`[CACHE] Using cached result for "${name}"`);
     return cached;
   }
-  
+
   if (cached) {
-    classificationCache.delete(normalized);
+    classificationCache.delete(key);
   }
-  
+
   return null;
 }
 
@@ -186,9 +188,9 @@ function setCachedResult(name: string, result: CachedResult): void {
     logger.warn('[CACHE] Invalid data for caching:', { name, result });
     return;
   }
-  
-  const normalized = normalizeForCache(name);
-  if (!normalized) {
+
+  const key = getCacheKey(name);
+  if (!key) {
     return;
   }
 
@@ -199,7 +201,7 @@ function setCachedResult(name: string, result: CachedResult): void {
     }
   }
 
-  classificationCache.set(normalized, {
+  classificationCache.set(key, {
     ...result,
     timestamp: Date.now()
   });
@@ -268,13 +270,11 @@ function validateApiResponse(content: string, expectedCount: number): any[] {
 
   logger.info(`[VALIDATION] Raw API response:`, content);
 
-  // The `json_object` response format should already be valid JSON.
-  // Remove possible markdown fences for backward compatibility.
   const cleanContent = content
     .replace(/```json\n?/g, '')
     .replace(/```\n?/g, '')
     .trim();
-  
+
   let parsed: any;
   try {
     parsed = JSON.parse(cleanContent);
@@ -283,47 +283,13 @@ function validateApiResponse(content: string, expectedCount: number): any[] {
     throw new Error(`Failed to parse API response as JSON: ${parseError}`);
   }
 
-  // Extract array from various possible response structures
-  let classifications: any[];
-  if (Array.isArray(parsed)) {
-    classifications = parsed;
-  } else if (parsed && typeof parsed === 'object') {
-    classifications = parsed.results || parsed.payees || parsed.classifications || parsed.data || [];
-  } else {
-    throw new Error('API response is not in expected format');
-  }
+  let classifications: any[] = Array.isArray(parsed)
+    ? parsed
+    : parsed?.results || parsed?.payees || parsed?.classifications || parsed?.data;
 
-  if (!Array.isArray(classifications)) {
-    throw new Error('No valid classifications array found in response');
-  }
-
-  logger.info(`[VALIDATION] Extracted ${classifications.length} classifications, expected ${expectedCount}`);
-
-  // Validate each classification object
-  const validatedClassifications = classifications.slice(0, expectedCount).map((item, index) => {
-    if (!item || typeof item !== 'object') {
-      throw new Error(`Classification ${index} is not a valid object`);
-    }
-
-    const { name, classification, confidence, reasoning } = item;
-
-    if (!classification || (classification !== 'Business' && classification !== 'Individual')) {
-      throw new Error(`Invalid classification "${classification}" at index ${index}`);
-    }
-
-    if (typeof confidence !== 'number' || confidence < 0 || confidence > 100) {
-      throw new Error(`Invalid confidence "${confidence}" at index ${index}`);
-    }
-
-    return {
-      name: name || `Unknown-${index}`,
-      classification,
-      confidence: Math.min(100, Math.max(0, confidence)),
-      reasoning: reasoning || 'No reasoning provided'
-    };
-  });
-
-  return validatedClassifications;
+  const validated = classificationResponseSchema.parse(classifications).slice(0, expectedCount);
+  logger.info(`[VALIDATION] Extracted ${validated.length} classifications, expected ${expectedCount}`);
+  return validated;
 }
 
 /**
@@ -343,37 +309,35 @@ async function processBatch(
 }>> {
   logger.info(`[OPTIMIZED] Processing batch ${batchNumber} with ${batchItems.length} names`);
 
-  try {
-    const batchResults = await withRetry(async () => {
-      const prompt =
-        `Classify each payee name as "Business" or "Individual". Return ONLY a JSON array:\n` +
-        `[\n  {"name": "payee_name", "classification": "Business", "confidence": 95, "reasoning": "brief reason"},\n` +
-        `  {"name": "next_payee", "classification": "Individual", "confidence": 90, "reasoning": "brief reason"}\n]\n\n` +
-        `Names to classify:\n${batchItems
-          .map((item, idx) => `${idx + 1}. "${item.processed}"`)
-          .join('\n')}`;
+    try {
+      const validatedClassifications = await withRetry(async () => {
+        const prompt =
+          `Classify each payee name as "Business" or "Individual". Return ONLY a JSON array:\n` +
+          `[\n  {"name": "payee_name", "classification": "Business", "confidence": 95, "reasoning": "brief reason"},\n` +
+          `  {"name": "next_payee", "classification": "Individual", "confidence": 90, "reasoning": "brief reason"}\n]\n\n` +
+          `Names to classify:\n${batchItems
+            .map((item, idx) => `${idx + 1}. "${item.processed}"`)
+            .join('\n')}`;
 
-      const apiCall = openaiClient.chat.completions.create({
-        model: CLASSIFICATION_MODEL,
-        messages: [
-          { role: 'system', content: 'You are an expert classifier. Return only valid JSON array, no other text.' },
-          { role: 'user', content: prompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-        max_tokens: 800
+        const apiCall = openaiClient.chat.completions.create({
+          model: CLASSIFICATION_MODEL,
+          messages: [
+            { role: 'system', content: 'You are an expert classifier. Return only valid JSON array, no other text.' },
+            { role: 'user', content: prompt }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+          max_tokens: 800
+        });
+
+        const response = await timeoutPromise(apiCall, timeout);
+        const content = (response as any)?.choices?.[0]?.message?.content;
+        if (!content) {
+          throw new Error('No response content from OpenAI API');
+        }
+
+        return validateApiResponse(content, batchItems.length);
       });
-
-      return await timeoutPromise(apiCall, timeout);
-    });
-
-    // Type the response properly to fix the TypeScript error
-    const content = (batchResults as any)?.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response content from OpenAI API');
-    }
-
-    const validatedClassifications = validateApiResponse(content, batchItems.length);
 
     const batchOutput: Array<{
       payeeName: string;
@@ -512,32 +476,21 @@ export async function optimizedBatchClassification(
 
   // Step 2: Process uncached names in batches with controlled concurrency
   if (uncachedNames.length > 0) {
-    const maxItemTokens = Math.floor(MAX_TOKENS / MAX_ITEMS_PER_REQUEST);
     const items: BatchItem[] = uncachedNames.map(name => {
-      const processed = preprocessPayeeDescription(name, maxItemTokens);
+      const processed = preprocessPayeeDescription(name, Math.floor(MAX_TOKENS / 4));
       return { original: name, processed, tokens: estimateTokens(processed) };
     });
 
     const batches: BatchItem[][] = [];
-    let currentBatch: BatchItem[] = [];
-    let currentTokens = PROMPT_OVERHEAD_TOKENS;
-
-    items.forEach(item => {
-      if (
-        currentBatch.length >= MAX_ITEMS_PER_REQUEST ||
-        currentTokens + item.tokens > MAX_TOKENS
-      ) {
-        if (currentBatch.length > 0) {
-          batches.push(currentBatch);
-        }
-        currentBatch = [];
-        currentTokens = PROMPT_OVERHEAD_TOKENS;
+    const MICRO_BATCH_SIZE = 20;
+    const MIN_BATCH_SIZE = 10;
+    for (let i = 0; i < items.length; i += MICRO_BATCH_SIZE) {
+      const slice = items.slice(i, i + MICRO_BATCH_SIZE);
+      if (slice.length < MIN_BATCH_SIZE && batches.length > 0) {
+        batches[batches.length - 1].push(...slice);
+      } else {
+        batches.push(slice);
       }
-      currentBatch.push(item);
-      currentTokens += item.tokens;
-    });
-    if (currentBatch.length > 0) {
-      batches.push(currentBatch);
     }
 
     let active: Promise<Array<{ payeeName: string; classification: 'Business' | 'Individual'; confidence: number; reasoning: string; source: 'api'; }>>[] = [];
