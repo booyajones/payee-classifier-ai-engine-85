@@ -1,6 +1,6 @@
 
 export interface ClassificationResult {
-  classification: 'Business' | 'Individual';
+  classification: 'Business' | 'Individual' | 'Unknown';
   confidence: number;
   reasoning: string;
   processingTier: 'Rule-Based' | 'NLP-Based' | 'AI-Assisted' | 'AI-Powered' | 'Excluded' | 'Failed';
