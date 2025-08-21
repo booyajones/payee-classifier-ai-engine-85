@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { parseUploadedFile } from "@/lib/fileValidation";
 import { validateFile, validatePayeeData } from "@/lib/fileValidation";
-import { ValidationResult } from "@/lib/fileValidation/types";
+import { ValidationResult, PayeeRecord } from "@/lib/fileValidation/types";
 import { handleError, showErrorToast } from "@/lib/errorHandler";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -16,6 +16,19 @@ export const useFileValidation = () => {
   const [fileError, setFileError] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const { toast } = useToast();
+
+  const COMPANY_SUFFIXES = [
+    'inc', 'inc.', 'llc', 'l.l.c.', 'corp', 'corporation', 'company', 'co', 'co.', 'ltd', 'limited',
+    'plc', 'gmbh', 's.a.', 's.a', 's.l.', 's.l', 's.a.s', 'ltda'
+  ];
+
+  const normalizeName = (name: string): string => {
+    let norm = name.toLowerCase().normalize('NFKC');
+    norm = norm.replace(/[^\p{L}\p{N} ]+/gu, '');
+    const suffixRegex = new RegExp(`\\b(${COMPANY_SUFFIXES.join('|')})\\b`, 'gi');
+    norm = norm.replace(suffixRegex, '');
+    return norm.replace(/\s+/g, ' ').trim();
+  };
 
   const resetValidation = () => {
     setFile(null);
@@ -52,43 +65,47 @@ export const useFileValidation = () => {
       }
 
       setFile(selectedFile);
-      
-      // Parse headers only to get column names
-      const headers = await parseUploadedFile(selectedFile, true);
+
+      const { headers, rows } = await parseUploadedFile(selectedFile);
       if (!headers || headers.length === 0) {
         throw new Error('No columns found in the file');
       }
 
       setColumns(headers);
-      
-      // Also parse the full file data to store for later use
-      const fullData = await parseUploadedFile(selectedFile, false);
-      setOriginalFileData(fullData);
-      
-      console.log(`[FILE VALIDATION] Stored ${fullData.length} rows of original data with ${headers.length} columns`);
-      
-      // Auto-select column if it contains "payee" or "name"
+
       const payeeColumn = headers.find(
         col => col.toLowerCase().includes('payee') || col.toLowerCase().includes('name')
       );
-      
+
       if (payeeColumn) {
         setSelectedColumn(payeeColumn);
       }
 
-      // Create validation result
+      const fullData: any[] = [];
+      const payees: PayeeRecord[] = [];
+      for await (const row of rows) {
+        fullData.push(row);
+        const raw = String(row[payeeColumn || headers[0]] || '').trim() || '[Empty]';
+        const norm = normalizeName(raw);
+        payees.push({ raw_name: raw, norm_name: norm });
+      }
+
+      setOriginalFileData(fullData);
+
+      console.log(`[FILE VALIDATION] Stored ${fullData.length} rows of original data with ${headers.length} columns`);
+
       const result: ValidationResult = {
-        payeeNames: fullData.map(row => {
-          const name = row[payeeColumn || headers[0]];
-          return String(name || '').trim() || '[Empty]';
-        }),
+        payees,
+        payeeNames: payees.map(p => p.raw_name),
         originalData: fullData,
         payeeColumnName: payeeColumn
       };
       setValidationResult(result);
 
+      setFileInfo({ rowCount: fullData.length, payeeCount: payees.length });
+
       setValidationStatus('valid');
-      
+
       toast({
         title: "File Uploaded Successfully",
         description: `Found ${headers.length} columns and ${fullData.length} rows. ${payeeColumn ? `Auto-selected "${payeeColumn}" column.` : 'Please select the payee name column.'}`,
@@ -121,25 +138,25 @@ export const useFileValidation = () => {
         return null;
       }
 
-      // Extract payee names WITHOUT filtering to maintain 1:1 correspondence
-      const payeeNames = originalFileData.map(row => {
-        const name = row[selectedColumn];
-        return String(name || '').trim() || '[Empty]';
+      const payees: PayeeRecord[] = originalFileData.map(row => {
+        const raw = String(row[selectedColumn] || '').trim() || '[Empty]';
+        const norm = normalizeName(raw);
+        return { raw_name: raw, norm_name: norm };
       });
-      
-      console.log(`[FILE VALIDATION] Maintaining exact 1:1 correspondence: ${originalFileData.length} rows = ${payeeNames.length} payees`);
-      
-      // Update validation result with new column selection
+
+      console.log(`[FILE VALIDATION] Maintaining exact 1:1 correspondence: ${originalFileData.length} rows = ${payees.length} payees`);
+
       const result: ValidationResult = {
-        payeeNames,
+        payees,
+        payeeNames: payees.map(p => p.raw_name),
         originalData: originalFileData,
         payeeColumnName: selectedColumn
       };
       setValidationResult(result);
-      
+
       setFileInfo({
         rowCount: originalFileData.length,
-        payeeCount: payeeNames.length
+        payeeCount: payees.length
       });
 
       setValidationStatus('valid');
