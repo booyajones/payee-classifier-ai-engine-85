@@ -10,6 +10,7 @@ import { exportResultsFixed } from '@/lib/classification/fixedExporter';
 import { BatchProcessingResult } from '@/lib/types';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 interface ProcessingHistoryProps {
   onResultSelect?: (result: StoredBatchResult) => void;
@@ -32,12 +33,10 @@ const ProcessingHistory = ({ onResultSelect }: ProcessingHistoryProps) => {
         return;
       }
       
-      console.log('[PROCESSING HISTORY] Loading history...');
       const results = await getProcessingHistory();
-      console.log('[PROCESSING HISTORY] Loaded results:', results.length);
       setHistory(results);
     } catch (error) {
-      console.error('[PROCESSING HISTORY] Failed to load history:', error);
+      logger.error('[PROCESSING HISTORY] Failed to load history:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(errorMessage);
       

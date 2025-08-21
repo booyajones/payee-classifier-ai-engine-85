@@ -15,7 +15,6 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import ClassificationErrorBoundary from "@/components/ClassificationErrorBoundary";
 
 const Index = () => {
-  console.log('[INDEX] Index page rendering...');
   
   const [classificationResults, setClassificationResults] = useState<PayeeClassification[]>([]);
   const [lastProcessingSummary, setLastProcessingSummary] = useState<BatchProcessingResult | null>(null);

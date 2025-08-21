@@ -3,9 +3,10 @@ import { FileValidationError, ERROR_CODES } from '../errorHandler';
 import { FileValidationResult } from './types';
 import { MAX_ROWS } from './constants';
 import { cleanPayeeNames } from './payeeExtractor';
+import { logger } from '@/lib/logger';
 
 export const validatePayeeData = (data: any[], selectedColumn: string): FileValidationResult => {
-  console.log(`[PAYEE VALIDATION] Validating ${data.length} rows for column: ${selectedColumn}`);
+  logger.info(`[PAYEE VALIDATION] Validating ${data.length} rows for column: ${selectedColumn}`);
 
   if (!data || data.length === 0) {
     return {
@@ -64,7 +65,7 @@ export const validatePayeeData = (data: any[], selectedColumn: string): FileVali
   const uniquePayees = [...new Set(payeeNames)];
   const duplicateCount = payeeNames.length - uniquePayees.length;
 
-  console.log(`[PAYEE VALIDATION] Found ${payeeNames.length} total payees, ${uniquePayees.length} unique, ${duplicateCount} duplicates`);
+  logger.info(`[PAYEE VALIDATION] Found ${payeeNames.length} total payees, ${uniquePayees.length} unique, ${duplicateCount} duplicates`);
 
   return {
     isValid: true,

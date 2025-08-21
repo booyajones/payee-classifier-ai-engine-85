@@ -2,6 +2,7 @@
 import { cancelBatchJob } from "@/lib/openai/trueBatchAPI";
 import { handleError, showErrorToast } from "@/lib/errorHandler";
 import { isValidBatchJobId } from "@/lib/storage/batchJobStorage";
+import { logger } from '@/lib/logger';
 
 interface UseBatchCancelProps {
   onJobUpdate: (job: any) => void;
@@ -21,7 +22,7 @@ export const useBatchCancel = ({ onJobUpdate, onJobDelete, toast }: UseBatchCanc
     }
 
     try {
-      console.log(`[BATCH MANAGER] Cancelling job ${jobId}`);
+      logger.info(`[BATCH MANAGER] Cancelling job ${jobId}`);
       const cancelledJob = await cancelBatchJob(jobId);
       onJobUpdate(cancelledJob);
       
@@ -31,7 +32,7 @@ export const useBatchCancel = ({ onJobUpdate, onJobDelete, toast }: UseBatchCanc
       });
     } catch (error) {
       const appError = handleError(error, 'Job Cancellation');
-      console.error(`[BATCH MANAGER] Error cancelling job ${jobId}:`, error);
+      logger.error(`[BATCH MANAGER] Error cancelling job ${jobId}:`, error);
       
       // Handle 404 errors specifically
       if (error instanceof Error && error.message.includes('404')) {

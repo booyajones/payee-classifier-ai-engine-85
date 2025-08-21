@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { logger } from '@/lib/logger';
 
 const KeywordExclusionManager = () => {
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -38,7 +39,7 @@ const KeywordExclusionManager = () => {
       const stored = localStorage.getItem(EXCLUDED_KEYWORDS_STORAGE_KEY);
       return stored ? validateExclusionKeywords(JSON.parse(stored)) : [];
     } catch (error) {
-      console.warn("Failed to load exclusion keywords", error);
+      logger.warn("Failed to load exclusion keywords", error);
       return [];
     }
   };
@@ -47,7 +48,7 @@ const KeywordExclusionManager = () => {
     try {
       localStorage.setItem(EXCLUDED_KEYWORDS_STORAGE_KEY, JSON.stringify(list));
     } catch (error) {
-      console.warn("Failed to save exclusion keywords", error);
+      logger.warn("Failed to save exclusion keywords", error);
     }
   };
 

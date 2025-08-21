@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { BatchJob, checkBatchJobStatus } from '@/lib/openai/trueBatchAPI';
 import { useToast } from '@/components/ui/use-toast';
+import { logger } from '@/lib/logger';
 
 interface PollingState {
   isPolling: boolean;
@@ -37,7 +38,7 @@ export const useBatchJobPolling = (
 
   // Start polling for a specific job (only when manually triggered)
   const startPolling = (jobId: string) => {
-    console.log(`[POLLING] Starting 1-minute polling for job ${jobId}`);
+    logger.info(`[POLLING] Starting 1-minute polling for job ${jobId}`);
     
     setPollingStates(prev => ({
       ...prev,
@@ -51,7 +52,7 @@ export const useBatchJobPolling = (
 
     const pollJob = async (currentPollCount: number) => {
       try {
-        console.log(`[POLLING] Auto-poll #${currentPollCount + 1} for job ${jobId}`);
+        logger.info(`[POLLING] Auto-poll #${currentPollCount + 1} for job ${jobId}`);
         
         const updatedJob = await checkBatchJobStatus(jobId);
         const previousJob = jobs.find(j => j.id === jobId);
@@ -71,7 +72,7 @@ export const useBatchJobPolling = (
 
         // Check if job just completed (status changed to completed)
         if (updatedJob.status === 'completed' && previousJob?.status !== 'completed') {
-          console.log(`[POLLING] Job ${jobId} just completed - triggering auto-download`);
+          logger.info(`[POLLING] Job ${jobId} just completed - triggering auto-download`);
           
           // Stop polling
           if (intervalRefs.current[jobId]) {
@@ -98,7 +99,7 @@ export const useBatchJobPolling = (
 
         // Check if job is complete but was already completed
         if (['completed', 'failed', 'expired', 'cancelled'].includes(updatedJob.status)) {
-          console.log(`[POLLING] Job ${jobId} already completed with status: ${updatedJob.status}`);
+          logger.info(`[POLLING] Job ${jobId} already completed with status: ${updatedJob.status}`);
           
           if (intervalRefs.current[jobId]) {
             clearInterval(intervalRefs.current[jobId]);
@@ -118,7 +119,7 @@ export const useBatchJobPolling = (
         }, getPollingInterval());
 
       } catch (error) {
-        console.error(`[POLLING] Error polling job ${jobId}:`, error);
+        logger.error(`[POLLING] Error polling job ${jobId}:`, error);
         
         const newConsecutiveFailures = (pollingStates[jobId]?.consecutiveFailures || 0) + 1;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -135,7 +136,7 @@ export const useBatchJobPolling = (
 
         // Stop polling after 3 failures
         if (newConsecutiveFailures >= 3) {
-          console.error(`[POLLING] Stopping polling for job ${jobId} after ${newConsecutiveFailures} failures`);
+          logger.error(`[POLLING] Stopping polling for job ${jobId} after ${newConsecutiveFailures} failures`);
           
           if (intervalRefs.current[jobId]) {
             clearInterval(intervalRefs.current[jobId]);
@@ -171,7 +172,7 @@ export const useBatchJobPolling = (
   // Manual refresh function - SINGLE REQUEST ONLY
   const manualRefresh = async (jobId: string) => {
     try {
-      console.log(`[POLLING] Manual refresh for job ${jobId}`);
+      logger.info(`[POLLING] Manual refresh for job ${jobId}`);
       const previousJob = jobs.find(j => j.id === jobId);
       const updatedJob = await checkBatchJobStatus(jobId);
       
@@ -189,7 +190,7 @@ export const useBatchJobPolling = (
       
       // Check if job just completed during manual refresh
       if (updatedJob.status === 'completed' && previousJob?.status !== 'completed') {
-        console.log(`[POLLING] Job ${jobId} completed during manual refresh - triggering auto-download`);
+        logger.info(`[POLLING] Job ${jobId} completed during manual refresh - triggering auto-download`);
         if (onJobCompleted) {
           onJobCompleted(updatedJob);
         }

@@ -1,6 +1,7 @@
 
 import { useState, useRef } from 'react';
 import { useStorageCleanup } from './useStorageCleanup';
+import { logger } from '@/lib/logger';
 
 interface FallbackStorageHook {
   setItem: (key: string, value: string) => boolean;
@@ -26,11 +27,11 @@ export const useFallbackStorage = (): FallbackStorageHook => {
         return true;
       }
     } catch (error) {
-      console.warn(`[FALLBACK STORAGE] localStorage failed for ${key}:`, error);
+      logger.warn(`[FALLBACK STORAGE] localStorage failed for ${key}:`, error);
     }
 
     // Fallback to memory storage
-    console.log(`[FALLBACK STORAGE] Using memory storage for ${key}`);
+    logger.info(`[FALLBACK STORAGE] Using memory storage for ${key}`);
     memoryStorage.current[key] = value;
     setIsUsingFallback(true);
     setStorageStatus('memory');
@@ -45,7 +46,7 @@ export const useFallbackStorage = (): FallbackStorageHook => {
         return value;
       }
     } catch (error) {
-      console.warn(`[FALLBACK STORAGE] localStorage read failed for ${key}:`, error);
+      logger.warn(`[FALLBACK STORAGE] localStorage read failed for ${key}:`, error);
     }
 
     // Check memory storage
@@ -57,7 +58,7 @@ export const useFallbackStorage = (): FallbackStorageHook => {
     try {
       localStorage.removeItem(key);
     } catch (error) {
-      console.warn(`[FALLBACK STORAGE] localStorage remove failed for ${key}:`, error);
+      logger.warn(`[FALLBACK STORAGE] localStorage remove failed for ${key}:`, error);
     }
 
     delete memoryStorage.current[key];

@@ -8,6 +8,7 @@ import {
   upsertClassifications,
   supabase,
 } from '@/lib/backend';
+import { logger } from '@/lib/logger';
 
 export { isSupabaseConfigured } from '@/lib/backend';
 
@@ -42,11 +43,11 @@ export const saveProcessingResults = async (
   jobType: 'direct' | 'batch' = 'direct'
 ): Promise<string> => {
   if (!isSupabaseConfigured()) {
-    console.warn('[RESULT STORAGE] Supabase not configured, skipping save');
+    logger.warn('[RESULT STORAGE] Supabase not configured, skipping save');
     throw new Error('Database not configured. Please set up Supabase to save results.');
   }
 
-  console.log(`[RESULT STORAGE] Saving ${results.length} results to database`);
+  logger.info(`[RESULT STORAGE] Saving ${results.length} results to database`);
 
   const businessCount = results.filter(r => r.result.classification === 'Business').length;
   const individualCount = results.filter(r => r.result.classification === 'Individual').length;
@@ -88,13 +89,13 @@ export const saveProcessingResults = async (
   }));
   await upsertClassifications(classificationBuffer);
 
-  console.log(`[RESULT STORAGE] Successfully saved results with batch ID: ${batchId}`);
+  logger.info(`[RESULT STORAGE] Successfully saved results with batch ID: ${batchId}`);
   return batchId;
 };
 
 export const getResultById = async (id: string): Promise<StoredBatchResult | null> => {
   if (!isSupabaseConfigured()) {
-    console.warn('[RESULT STORAGE] Supabase not configured');
+    logger.warn('[RESULT STORAGE] Supabase not configured');
     return null;
   }
 
@@ -104,7 +105,7 @@ export const getResultById = async (id: string): Promise<StoredBatchResult | nul
     .eq('id', id)
     .single();
   if (batchError || !batch) {
-    console.error('[RESULT STORAGE] Error fetching batch:', batchError);
+    logger.error('[RESULT STORAGE] Error fetching batch:', batchError);
     return null;
   }
 
@@ -114,7 +115,7 @@ export const getResultById = async (id: string): Promise<StoredBatchResult | nul
     .eq('batch_id', id)
     .order('row_index', { ascending: true });
   if (rowsError) {
-    console.error('[RESULT STORAGE] Error fetching rows:', rowsError);
+    logger.error('[RESULT STORAGE] Error fetching rows:', rowsError);
     return null;
   }
 
@@ -155,7 +156,7 @@ export const getResultById = async (id: string): Promise<StoredBatchResult | nul
 
 export const getProcessingHistory = async (): Promise<StoredBatchResult[]> => {
   if (!isSupabaseConfigured()) {
-    console.warn('[RESULT STORAGE] Supabase not configured, returning empty history');
+    logger.warn('[RESULT STORAGE] Supabase not configured, returning empty history');
     throw new Error('Database not configured. Please set up Supabase to view processing history.');
   }
 
@@ -164,7 +165,7 @@ export const getProcessingHistory = async (): Promise<StoredBatchResult[]> => {
     .select('*')
     .order('created_at', { ascending: false });
   if (error) {
-    console.error('[RESULT STORAGE] Error fetching history:', error);
+    logger.error('[RESULT STORAGE] Error fetching history:', error);
     throw new Error(`Failed to fetch history: ${error.message}`);
   }
 
@@ -186,7 +187,7 @@ export const deleteResult = async (id: string): Promise<void> => {
     .delete()
     .eq('id', id);
   if (error) {
-    console.error('[RESULT STORAGE] Error deleting result:', error);
+    logger.error('[RESULT STORAGE] Error deleting result:', error);
     throw new Error(`Failed to delete result: ${error.message}`);
   }
 };

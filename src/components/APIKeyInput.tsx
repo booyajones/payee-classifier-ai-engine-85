@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { isOpenAIInitialized, initializeOpenAI, testOpenAIConnection, clearOpenAIKeys } from "@/lib/openai/client";
 import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle, Key, Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
+import { logger } from '@/lib/logger';
 
 interface APIKeyInputProps {
   onApiKeySet: () => void;
@@ -26,7 +27,7 @@ const APIKeyInput = ({ onApiKeySet, onApiKeyChange }: APIKeyInputProps) => {
   // Test if OpenAI is already working on component mount
   useEffect(() => {
     const testConnection = async () => {
-      console.log('[API_KEY_INPUT] Testing existing connection...');
+      logger.info('[API_KEY_INPUT] Testing existing connection...');
       
       if (isOpenAIInitialized()) {
         try {
@@ -37,7 +38,7 @@ const APIKeyInput = ({ onApiKeySet, onApiKeyChange }: APIKeyInputProps) => {
           );
           
           const isWorking = await Promise.race([testPromise, timeoutPromise]);
-          console.log('[API_KEY_INPUT] Connection test result:', isWorking);
+          logger.info('[API_KEY_INPUT] Connection test result:', isWorking);
           
           if (isWorking) {
             setConnectionWorking(true);
@@ -53,11 +54,11 @@ const APIKeyInput = ({ onApiKeySet, onApiKeyChange }: APIKeyInputProps) => {
             setHasConnectionError(true);
           }
         } catch (error) {
-          console.log('[API_KEY_INPUT] Connection test failed or timed out:', error);
+          logger.warn('[API_KEY_INPUT] Connection test failed or timed out:', error);
           setHasConnectionError(true);
         }
       } else {
-        console.log('[API_KEY_INPUT] No API key initialized');
+        logger.info('[API_KEY_INPUT] No API key initialized');
       }
       setIsTestingConnection(false);
     };
@@ -80,11 +81,11 @@ const APIKeyInput = ({ onApiKeySet, onApiKeyChange }: APIKeyInputProps) => {
     setIsValidating(true);
     
     try {
-      console.log('[API_KEY_INPUT] Initializing with new API key...');
+      logger.info('[API_KEY_INPUT] Initializing with new API key...');
       await initializeOpenAI(apiKey.trim(), rememberKey);
       
       // Skip immediate test since initialization already validates format
-      console.log('[API_KEY_INPUT] API key initialized successfully');
+      logger.info('[API_KEY_INPUT] API key initialized successfully');
       
       toast({
         title: "API Key Set Successfully",
@@ -98,7 +99,7 @@ const APIKeyInput = ({ onApiKeySet, onApiKeyChange }: APIKeyInputProps) => {
       onApiKeySet();
       onApiKeyChange?.(); // Call the optional callback
     } catch (error) {
-      console.error("Error setting API key:", error);
+      logger.error("Error setting API key:", error);
       toast({
         title: "API Key Error",
         description: "Failed to initialize OpenAI client. Please check your API key.",

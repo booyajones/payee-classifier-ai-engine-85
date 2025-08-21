@@ -14,7 +14,6 @@ import BatchStatus from "./pages/BatchStatus";
 const queryClient = new QueryClient();
 
 const App = () => {
-  console.log('[APP] App component rendering...');
   
   return (
     <ErrorBoundary>

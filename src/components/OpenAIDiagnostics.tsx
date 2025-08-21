@@ -6,13 +6,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Wrench, CheckCircle, XCircle, AlertTriangle, RefreshCw } from "lucide-react";
-import { 
-  getOpenAIClientDiagnostics, 
-  testOpenAIConnection, 
+import {
+  getOpenAIClientDiagnostics,
+  testOpenAIConnection,
   clearOpenAIKeys,
-  isOpenAIInitialized 
+  isOpenAIInitialized
 } from "@/lib/openai/client";
 import { getApiKeyDiagnostics, clearAllApiKeys } from "@/lib/backend/apiKeyService";
+import { logger } from '@/lib/logger';
 
 interface OpenAIDiagnosticsProps {
   onReset?: () => void;
@@ -27,24 +28,24 @@ const OpenAIDiagnostics = ({ onReset }: OpenAIDiagnosticsProps) => {
   const runDiagnostics = async () => {
     setIsRunning(true);
     try {
-      console.log('[DIAGNOSTICS] Running OpenAI diagnostics...');
+      logger.info('[DIAGNOSTICS] Running OpenAI diagnostics...');
       
       const clientDiagnostics = getOpenAIClientDiagnostics();
       const storageDiagnostics = getApiKeyDiagnostics();
       const isInitialized = isOpenAIInitialized();
       
-      console.log('[DIAGNOSTICS] Client diagnostics:', clientDiagnostics);
-      console.log('[DIAGNOSTICS] Storage diagnostics:', storageDiagnostics);
-      console.log('[DIAGNOSTICS] Is initialized:', isInitialized);
+      logger.info('[DIAGNOSTICS] Client diagnostics:', clientDiagnostics);
+      logger.info('[DIAGNOSTICS] Storage diagnostics:', storageDiagnostics);
+      logger.info('[DIAGNOSTICS] Is initialized:', isInitialized);
       
       // Test connection if client appears to be initialized
       let connectionResult = null;
       if (isInitialized) {
         try {
           connectionResult = await testOpenAIConnection();
-          console.log('[DIAGNOSTICS] Connection test result:', connectionResult);
+          logger.info('[DIAGNOSTICS] Connection test result:', connectionResult);
         } catch (error) {
-          console.error('[DIAGNOSTICS] Connection test error:', error);
+          logger.error('[DIAGNOSTICS] Connection test error:', error);
           connectionResult = false;
         }
       }
@@ -64,7 +65,7 @@ const OpenAIDiagnostics = ({ onReset }: OpenAIDiagnosticsProps) => {
       });
       
     } catch (error) {
-      console.error('[DIAGNOSTICS] Diagnostics failed:', error);
+      logger.error('[DIAGNOSTICS] Diagnostics failed:', error);
       toast({
         title: "Diagnostics Failed",
         description: "Failed to run diagnostics. Check console for details.",
@@ -76,7 +77,7 @@ const OpenAIDiagnostics = ({ onReset }: OpenAIDiagnosticsProps) => {
   };
 
   const handleClearAll = () => {
-    console.log('[DIAGNOSTICS] Clearing all OpenAI data...');
+    logger.info('[DIAGNOSTICS] Clearing all OpenAI data...');
     clearOpenAIKeys();
     clearAllApiKeys();
     setDiagnostics(null);

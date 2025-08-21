@@ -3,6 +3,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Bug } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -36,11 +37,11 @@ class ClassificationErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const context = this.props.context || 'Classification System';
-    console.error(`[${context} ERROR BOUNDARY] Component error caught:`, error, errorInfo);
+    logger.error(`[${context} ERROR BOUNDARY] Component error caught:`, error, errorInfo);
     
     // Log specific error types
     if (error.message.includes('Maximum call stack size exceeded')) {
-      console.error('[ERROR BOUNDARY] Stack overflow detected - possible infinite loop');
+      logger.error('[ERROR BOUNDARY] Stack overflow detected - possible infinite loop');
     }
     
     this.setState({ error, errorInfo });

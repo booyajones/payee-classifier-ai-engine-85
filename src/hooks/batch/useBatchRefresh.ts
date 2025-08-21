@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { checkBatchJobStatus } from "@/lib/openai/trueBatchAPI";
 import { isValidBatchJobId } from "@/lib/storage/batchJobStorage";
+import { logger } from '@/lib/logger';
 
 interface UseBatchRefreshProps {
   onJobDelete: (jobId: string) => void;
@@ -24,10 +25,10 @@ export const useBatchRefresh = ({ onJobDelete, toast }: UseBatchRefreshProps) =>
 
     setRefreshingJobs(prev => new Set(prev).add(jobId));
     try {
-      console.log(`[BATCH MANAGER] Manual refresh for job ${jobId}`);
+      logger.info(`[BATCH MANAGER] Manual refresh for job ${jobId}`);
       await manualRefresh(jobId);
     } catch (error) {
-      console.error(`[BATCH MANAGER] Manual refresh failed for job ${jobId}:`, error);
+      logger.error(`[BATCH MANAGER] Manual refresh failed for job ${jobId}:`, error);
       
       // Handle 404 errors specifically
       if (error instanceof Error && error.message.includes('404')) {

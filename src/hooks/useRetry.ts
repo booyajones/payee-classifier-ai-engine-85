@@ -1,6 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { AppError, handleError } from '@/lib/errorHandler';
+import { logger } from '@/lib/logger';
 
 interface RetryState {
   isRetrying: boolean;
@@ -52,7 +53,7 @@ export const useRetry = <T extends any[], R>(
           const appError = handleError(error, 'Retry operation');
           
           if (attemptNumber < maxRetries) {
-            console.log(`[RETRY] Attempt ${attemptNumber + 1} failed, retrying in ${baseDelay * Math.pow(2, attemptNumber)}ms`);
+            logger.warn(`[RETRY] Attempt ${attemptNumber + 1} failed, retrying in ${baseDelay * Math.pow(2, attemptNumber)}ms`);
             
             // Exponential backoff
             await new Promise(resolve => 

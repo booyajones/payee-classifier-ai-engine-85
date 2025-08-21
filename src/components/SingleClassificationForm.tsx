@@ -12,6 +12,7 @@ import { PayeeClassification, ClassificationConfig } from "@/lib/types";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { logger } from '@/lib/logger';
 
 interface SingleClassificationFormProps {
   onComplete?: (results: PayeeClassification[], summary?: any) => void;
@@ -54,13 +55,13 @@ const SingleClassificationForm = ({ onComplete }: SingleClassificationFormProps)
     setIsProcessing(true);
     
     try {
-      console.log(`Starting V3 classification for: ${payeeName}`);
+      logger.info(`Starting V3 classification for: ${payeeName}`);
       
       // Use V3 classification with intelligent escalation
       const result = await enhancedClassifyPayeeV3(payeeName, config);
       const classification = createPayeeClassification(payeeName, result);
       
-      console.log(`V3 Classification result:`, result);
+      logger.info(`V3 Classification result:`, result);
       
       setCurrentResult(classification);
       
@@ -74,7 +75,7 @@ const SingleClassificationForm = ({ onComplete }: SingleClassificationFormProps)
         description: `${payeeName} classified as ${result.classification} with ${result.confidence}% confidence using V3 intelligent escalation.`,
       });
     } catch (error) {
-      console.error("V3 Classification error:", error);
+      logger.error("V3 Classification error:", error);
       toast({
         title: "Classification Error",
         description: error instanceof Error ? error.message : "An error occurred while processing your request.",

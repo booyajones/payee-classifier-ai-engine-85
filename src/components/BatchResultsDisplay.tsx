@@ -8,6 +8,7 @@ import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
 import { exportResultsWithOriginalDataV3 } from "@/lib/classification/exporters";
 import { exportResultsFixed } from "@/lib/classification/fixedExporter";
 import * as XLSX from 'xlsx';
+import { logger } from '@/lib/logger';
 
 interface BatchResultsDisplayProps {
   batchResults: PayeeClassification[];
@@ -37,15 +38,12 @@ const BatchResultsDisplay = ({
     }
 
     try {
-      console.log('[EXPORT] Processing summary:', processingSummary);
-      console.log('[EXPORT] Has original file data:', !!processingSummary.originalFileData);
       
       // Use custom export function if provided, otherwise use default
       const exportData = exportFunction 
         ? exportFunction(processingSummary, true)
         : exportResultsWithOriginalDataV3(processingSummary, true);
       
-      console.log('[EXPORT] Export data sample:', exportData.slice(0, 2));
       
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -62,7 +60,7 @@ const BatchResultsDisplay = ({
         description: `Enhanced results exported to ${filename} with original file data and keyword exclusion details.`,
       });
     } catch (error) {
-      console.error("Export error:", error);
+      logger.error("Export error:", error);
       toast({
         title: "Export Error",
         description: "Failed to export results. Please try again.",

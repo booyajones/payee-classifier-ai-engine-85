@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 const STORAGE_KEYS = {
   BATCH_JOBS: 'batchJobs',
@@ -23,7 +24,7 @@ export const useStorageCleanup = () => {
 
   const emergencyCleanup = (): boolean => {
     try {
-      console.log('[STORAGE] EMERGENCY CLEANUP INITIATED');
+      logger.info('[STORAGE] EMERGENCY CLEANUP INITIATED');
       
       // 1. Remove all old processing results immediately
       const allKeys = Object.keys(localStorage);
@@ -36,7 +37,7 @@ export const useStorageCleanup = () => {
       resultKeys.forEach(key => {
         localStorage.removeItem(key);
       });
-      console.log(`[STORAGE] Emergency: Removed ${resultKeys.length} result files`);
+      logger.info(`[STORAGE] Emergency: Removed ${resultKeys.length} result files`);
       
       // 2. Clean up batch jobs - keep only the 5 most recent and remove originalFileData
       const batchJobsData = localStorage.getItem(STORAGE_KEYS.BATCH_JOBS);
@@ -54,10 +55,10 @@ export const useStorageCleanup = () => {
             }));
             
             localStorage.setItem(STORAGE_KEYS.BATCH_JOBS, JSON.stringify(lightweightJobs));
-            console.log(`[STORAGE] Emergency: Trimmed batch jobs to ${lightweightJobs.length}, removed originalFileData`);
+            logger.info(`[STORAGE] Emergency: Trimmed batch jobs to ${lightweightJobs.length}, removed originalFileData`);
           }
         } catch (error) {
-          console.error('[STORAGE] Emergency: Error cleaning batch jobs:', error);
+          logger.error('[STORAGE] Emergency: Error cleaning batch jobs:', error);
           localStorage.removeItem(STORAGE_KEYS.BATCH_JOBS);
         }
       }
@@ -70,7 +71,7 @@ export const useStorageCleanup = () => {
             const item = localStorage.getItem(key);
             if (item && item.length > 50000) { // Remove items larger than 50KB
               localStorage.removeItem(key);
-              console.log(`[STORAGE] Emergency: Removed large item ${key}`);
+              logger.info(`[STORAGE] Emergency: Removed large item ${key}`);
             }
           } catch (error) {
             // Remove corrupted items
@@ -80,10 +81,10 @@ export const useStorageCleanup = () => {
       });
       
       const finalSize = getStorageSize();
-      console.log(`[STORAGE] Emergency cleanup complete: ${(finalSize / 1024).toFixed(2)}KB remaining`);
+      logger.info(`[STORAGE] Emergency cleanup complete: ${(finalSize / 1024).toFixed(2)}KB remaining`);
       return true;
     } catch (error) {
-      console.error('[STORAGE] Emergency cleanup failed:', error);
+      logger.error('[STORAGE] Emergency cleanup failed:', error);
       return false;
     }
   };
@@ -93,17 +94,17 @@ export const useStorageCleanup = () => {
       const currentSize = getStorageSize();
       const usagePercent = currentSize / MAX_STORAGE_SIZE;
       
-      console.log(`[STORAGE] Current localStorage: ${(currentSize / 1024).toFixed(2)}KB (${(usagePercent * 100).toFixed(1)}%)`);
+      logger.info(`[STORAGE] Current localStorage: ${(currentSize / 1024).toFixed(2)}KB (${(usagePercent * 100).toFixed(1)}%)`);
       
       // Emergency cleanup if near quota
       if (usagePercent > EMERGENCY_CLEANUP_THRESHOLD) {
-        console.log('[STORAGE] EMERGENCY CLEANUP TRIGGERED');
+        logger.info('[STORAGE] EMERGENCY CLEANUP TRIGGERED');
         return emergencyCleanup();
       }
       
       // Regular cleanup
       if (usagePercent > REGULAR_CLEANUP_THRESHOLD) {
-        console.log('[STORAGE] Regular cleanup triggered');
+        logger.info('[STORAGE] Regular cleanup triggered');
         
         // Clean up old batch jobs (keep only last 10)
         const batchJobsKey = STORAGE_KEYS.BATCH_JOBS;
@@ -116,10 +117,10 @@ export const useStorageCleanup = () => {
               const sortedJobs = jobs.sort((a, b) => b.created_at - a.created_at);
               const trimmedJobs = sortedJobs.slice(0, 10);
               localStorage.setItem(batchJobsKey, JSON.stringify(trimmedJobs));
-              console.log(`[STORAGE] Trimmed batch jobs: ${jobs.length} -> ${trimmedJobs.length}`);
+              logger.info(`[STORAGE] Trimmed batch jobs: ${jobs.length} -> ${trimmedJobs.length}`);
             }
           } catch (error) {
-            console.error('[STORAGE] Error cleaning up batch jobs:', error);
+            logger.error('[STORAGE] Error cleaning up batch jobs:', error);
           }
         }
         
@@ -136,13 +137,13 @@ export const useStorageCleanup = () => {
         });
         
         if (keysToRemove.length > 0) {
-          console.log(`[STORAGE] Removed ${keysToRemove.length} old results`);
+          logger.info(`[STORAGE] Removed ${keysToRemove.length} old results`);
         }
       }
       
       return true;
     } catch (error) {
-      console.error('[STORAGE] Cleanup failed:', error);
+      logger.error('[STORAGE] Cleanup failed:', error);
       return emergencyCleanup();
     }
   };
@@ -152,17 +153,17 @@ export const useStorageCleanup = () => {
       localStorage.setItem(key, value);
       return true;
     } catch (error) {
-      console.error(`[STORAGE] Failed to set ${key}:`, error);
+      logger.error(`[STORAGE] Failed to set ${key}:`, error);
       
       // Try emergency cleanup and retry
       const cleanupSuccess = emergencyCleanup();
       if (cleanupSuccess) {
         try {
           localStorage.setItem(key, value);
-          console.log(`[STORAGE] Successfully saved ${key} after emergency cleanup`);
+          logger.info(`[STORAGE] Successfully saved ${key} after emergency cleanup`);
           return true;
         } catch (retryError) {
-          console.error(`[STORAGE] Still failed to set ${key} after emergency cleanup:`, retryError);
+          logger.error(`[STORAGE] Still failed to set ${key} after emergency cleanup:`, retryError);
         }
       }
       
@@ -189,9 +190,9 @@ export const useStorageCleanup = () => {
         localStorage.setItem(key, value);
       });
       
-      console.log('[STORAGE] Manual storage reset completed');
+      logger.info('[STORAGE] Manual storage reset completed');
     } catch (error) {
-      console.error('[STORAGE] Manual reset failed:', error);
+      logger.error('[STORAGE] Manual reset failed:', error);
     }
   };
 

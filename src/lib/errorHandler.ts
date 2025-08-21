@@ -1,4 +1,5 @@
 import { toast } from "@/hooks/use-toast";
+import { logger } from '@/lib/logger';
 
 export interface AppError {
   code: string;
@@ -65,7 +66,7 @@ export const RETRY_INSTRUCTIONS: Record<string, string> = {
 };
 
 export const handleError = (error: unknown, context?: string): AppError => {
-  console.error(`[ERROR HANDLER] ${context || 'Unknown context'}:`, error);
+  logger.error(`[ERROR HANDLER] ${context || 'Unknown context'}:`, error);
 
   if (error instanceof BatchProcessingError || error instanceof FileValidationError) {
     return error;
@@ -177,7 +178,7 @@ export const showErrorToast = (error: AppError, context?: string) => {
   });
 
   // Log detailed error for debugging
-  console.error(`[${error.code}] ${error.message}`, error.details);
+  logger.error(`[${error.code}] ${error.message}`, error.details);
 };
 
 export const showRetryableErrorToast = (
@@ -196,7 +197,7 @@ export const showRetryableErrorToast = (
 
     // For now, we'll just show the error without the retry button
     // The user can manually retry through the UI
-    console.log('[RETRY] Retryable error occurred:', error);
+    logger.warn('[RETRY] Retryable error occurred:', error);
   } else {
     showErrorToast(error, context);
   }

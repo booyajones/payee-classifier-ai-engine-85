@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Download, Trash, Loader2 } from "lucide-react";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
+import { logger } from '@/lib/logger';
 
 interface BatchJobActionsProps {
   job: BatchJob;
@@ -31,7 +32,7 @@ const BatchJobActions = ({
   // Jobs that can be downloaded
   const canDownload = job.status === 'completed';
 
-  console.log(`[BATCH ACTIONS] Job ${job.id.slice(-8)} - Status: ${job.status}, canDelete: ${canDelete}, canCancel: ${canCancel}`);
+  logger.debug(`[BATCH ACTIONS] Job ${job.id.slice(-8)} - Status: ${job.status}, canDelete: ${canDelete}, canCancel: ${canCancel}`);
 
   return (
     <div className="flex gap-2 flex-wrap">

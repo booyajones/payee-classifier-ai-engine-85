@@ -1,4 +1,5 @@
 import { ValidationResult } from './types';
+import { logger } from '@/lib/logger';
 
 export const validateFileContents = (data: any[]): ValidationResult => {
   if (!Array.isArray(data) || data.length === 0) {
@@ -51,7 +52,7 @@ export const validateFileContents = (data: any[]): ValidationResult => {
     payeeNames.push(payeeName || '[Empty]');
   }
 
-  console.log(`[FILE VALIDATION] Extracted ${payeeNames.length} payee names (including empty) and preserved ${originalData.length} original data rows with exact 1:1 correspondence`);
+  logger.info(`[FILE VALIDATION] Extracted ${payeeNames.length} payee names (including empty) and preserved ${originalData.length} original data rows with exact 1:1 correspondence`);
   
   return {
     payeeNames,

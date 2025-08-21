@@ -7,6 +7,7 @@ import { handleError, showRetryableErrorToast } from "@/lib/errorHandler";
 import { useRetry } from "@/hooks/useRetry";
 import { checkKeywordExclusion } from "@/lib/classification/enhancedKeywordExclusion";
 import { StoredBatchJob, isValidBatchJobId } from "@/lib/storage/batchJobStorage";
+import { logger } from '@/lib/logger';
 
 interface UseBatchDownloadProps {
   onJobComplete: (results: PayeeClassification[], summary: BatchProcessingResult, jobId: string) => void;
@@ -36,28 +37,23 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
     setDownloadingJobs(prev => new Set(prev).add(job.id));
     
     try {
-      console.log(`[BATCH MANAGER] Starting download for job ${job.id}`);
+      logger.info(`[BATCH MANAGER] Starting download for job ${job.id}`);
       
       // First, get the latest job status to ensure it's actually completed
       const latestJob = await checkBatchJobStatus(job.id);
-      console.log(`[BATCH MANAGER] Latest job status: ${latestJob.status}`);
+      logger.info(`[BATCH MANAGER] Latest job status: ${latestJob.status}`);
       
       if (latestJob.status !== 'completed') {
         throw new Error(`Job is not completed. Current status: ${latestJob.status}`);
       }
       
-      console.log(`[BATCH MANAGER] Downloading results for completed job ${job.id}`);
+      logger.info(`[BATCH MANAGER] Downloading results for completed job ${job.id}`);
       const payeeNames = job.payeeNames || [];
       const originalFileData = job.originalFileData || [];
       
-      console.log(`[BATCH MANAGER] Data verification:`, {
-        payeeNamesLength: payeeNames.length,
-        originalDataLength: originalFileData.length,
-        hasOriginalData: originalFileData.length > 0
-      });
       
       if (payeeNames.length === 0) {
-        console.warn(`[BATCH MANAGER] No payee names found for job ${job.id}`);
+        logger.warn(`[BATCH MANAGER] No payee names found for job ${job.id}`);
         throw new Error('No payee names found for this job. The job data may be corrupted.');
       }
 
@@ -65,13 +61,13 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       const hasOriginalData = originalFileData.length > 0;
       
       if (!hasOriginalData) {
-        console.warn(`[BATCH MANAGER] No original data found for job ${job.id} - will create fallback structure`);
+        logger.warn(`[BATCH MANAGER] No original data found for job ${job.id} - will create fallback structure`);
       }
 
       // Handle data alignment - be more flexible
       let alignedOriginalData = originalFileData;
       if (hasOriginalData && originalFileData.length !== payeeNames.length) {
-        console.warn(`[BATCH MANAGER] Data length mismatch: ${originalFileData.length} original vs ${payeeNames.length} payees - will align data`);
+        logger.warn(`[BATCH MANAGER] Data length mismatch: ${originalFileData.length} original vs ${payeeNames.length} payees - will align data`);
         
         // Try to align data or create fallback
         if (originalFileData.length > payeeNames.length) {
@@ -95,7 +91,7 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       // Get raw results from OpenAI with guaranteed index alignment
       const rawResults = await downloadResultsWithRetry(latestJob, payeeNames, originalRowIndexes);
       
-      console.log(`[BATCH MANAGER] Processing ${rawResults.length} results with alignment`);
+      logger.info(`[BATCH MANAGER] Processing ${rawResults.length} results with alignment`);
       
       // Process results maintaining correspondence
       const classifications = payeeNames.map((name, arrayIndex) => {
@@ -115,7 +111,6 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
           };
         }
         
-        console.log(`[BATCH MANAGER] Processing row ${arrayIndex}: "${name}"`);
         
         // Apply keyword exclusion check
         const keywordExclusion = checkKeywordExclusion(name);
@@ -161,7 +156,7 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       ).length;
       const failureCount = classifications.length - successCount;
 
-      console.log(`[BATCH MANAGER] Creating summary for ${classifications.length} classifications`);
+      logger.info(`[BATCH MANAGER] Creating summary for ${classifications.length} classifications`);
 
       // Create the summary with original data (or fallback)
       const summary: BatchProcessingResult = {
@@ -179,7 +174,7 @@ export const useBatchDownload = ({ onJobComplete, onJobDelete, toast }: UseBatch
       });
     } catch (error) {
       const appError = handleError(error, 'Results Download');
-      console.error(`[BATCH MANAGER] Error downloading results for job ${job.id}:`, error);
+      logger.error(`[BATCH MANAGER] Error downloading results for job ${job.id}:`, error);
       
       // Handle 404 errors specifically
       if (error instanceof Error && error.message.includes('404')) {

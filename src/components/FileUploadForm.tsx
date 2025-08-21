@@ -10,6 +10,7 @@ import ColumnSelector from "./file-upload/ColumnSelector";
 import FileUploadActions from "./file-upload/FileUploadActions";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { useToast } from "@/components/ui/use-toast";
+import { logger } from '@/lib/logger';
 
 interface FileUploadFormProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
@@ -53,7 +54,7 @@ const FileUploadForm = ({ onBatchJobCreated, isProcessing = false }: FileUploadF
         setSelectedColumn(validationResult.payeeColumnName);
       }
     } catch (error) {
-      console.error('File validation error:', error);
+      logger.error('File validation error:', error);
       toast({
         title: "File Validation Error",
         description: error instanceof Error ? error.message : "Failed to validate file",
@@ -78,7 +79,7 @@ const FileUploadForm = ({ onBatchJobCreated, isProcessing = false }: FileUploadF
       const payeeName = String(row[selectedColumn] || '').trim();
       payeeNames.push(payeeName || '[Empty]');
     }
-    console.log(`[FILE UPLOAD] Starting batch job creation with column: ${selectedColumn}`);
+    logger.info(`[FILE UPLOAD] Starting batch job creation with column: ${selectedColumn}`);
     await submitFileForProcessing({ ...validationResult, payeeNames }, selectedColumn);
   };
 

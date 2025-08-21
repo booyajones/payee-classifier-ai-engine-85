@@ -5,6 +5,7 @@ import { validateFile, validatePayeeData } from "@/lib/fileValidation";
 import { ValidationResult, PayeeRecord } from "@/lib/fileValidation/types";
 import { handleError, showErrorToast } from "@/lib/errorHandler";
 import { useToast } from "@/components/ui/use-toast";
+import { logger } from '@/lib/logger';
 
 export const useFileValidation = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -92,7 +93,7 @@ export const useFileValidation = () => {
 
       setOriginalFileData(fullData);
 
-      console.log(`[FILE VALIDATION] Stored ${fullData.length} rows of original data with ${headers.length} columns`);
+      logger.info(`[FILE VALIDATION] Stored ${fullData.length} rows of original data with ${headers.length} columns`);
 
       const result: ValidationResult = {
         payees,
@@ -114,7 +115,7 @@ export const useFileValidation = () => {
       return { success: true, headers, fullData };
     } catch (error) {
       const appError = handleError(error, 'File Upload');
-      console.error("Error parsing file:", error);
+      logger.error("Error parsing file:", error);
       setFileError(appError.message);
       setValidationStatus('error');
       setFile(null);
@@ -144,7 +145,7 @@ export const useFileValidation = () => {
         return { raw_name: raw, norm_name: norm };
       });
 
-      console.log(`[FILE VALIDATION] Maintaining exact 1:1 correspondence: ${originalFileData.length} rows = ${payees.length} payees`);
+      logger.info(`[FILE VALIDATION] Maintaining exact 1:1 correspondence: ${originalFileData.length} rows = ${payees.length} payees`);
 
       const result: ValidationResult = {
         payees,

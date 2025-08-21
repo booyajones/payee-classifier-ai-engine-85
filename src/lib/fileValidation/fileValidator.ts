@@ -2,9 +2,10 @@
 import { FileValidationError, ERROR_CODES } from '../errorHandler';
 import { FileValidationResult } from './types';
 import { MAX_FILE_SIZE, SUPPORTED_EXTENSIONS, VALID_MIME_TYPES } from './constants';
+import { logger } from '@/lib/logger';
 
 export const validateFile = (file: File): FileValidationResult => {
-  console.log(`[FILE VALIDATION] Validating file: ${file.name}, size: ${file.size} bytes`);
+  logger.info(`[FILE VALIDATION] Validating file: ${file.name}, size: ${file.size} bytes`);
 
   // Check file size
   if (file.size === 0) {
@@ -44,7 +45,7 @@ export const validateFile = (file: File): FileValidationResult => {
 
   // Check MIME type for additional validation
   if (file.type && !VALID_MIME_TYPES.includes(file.type)) {
-    console.warn(`[FILE VALIDATION] Unexpected MIME type: ${file.type}, but extension is valid`);
+    logger.warn(`[FILE VALIDATION] Unexpected MIME type: ${file.type}, but extension is valid`);
   }
 
   return {
