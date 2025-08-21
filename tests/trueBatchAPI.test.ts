@@ -54,11 +54,11 @@ describe('getBatchJobResults', () => {
     const jsonl = [
       JSON.stringify({
         custom_id: 'payee-0-1',
-        response: { status_code: 200, body: { choices: [{ message: { content: '{"classification":"Business","confidence":90,"reasoning":"r"}' } }] } }
+        response: { status_code: 200, body: { choices: [{ message: { content: '{"entity_type":"Business","sic_code":"1234","confidence":90}' } }] } }
       }),
       JSON.stringify({
         custom_id: 'payee-1-1',
-        response: { status_code: 200, body: { choices: [{ message: { content: '{"classification":"Individual","confidence":80,"reasoning":"r"}' } }] } }
+        response: { status_code: 200, body: { choices: [{ message: { content: '{"entity_type":"Individual","sic_code":"0000","confidence":80}' } }] } }
       })
     ].join('\n');
 
@@ -74,8 +74,9 @@ describe('getBatchJobResults', () => {
     const results = await getBatchJobResults(job, ['A', 'B']);
 
     expect(fileContent).toHaveBeenCalledWith('file1');
-    expect(results[0].classification).toBe('Business');
-    expect(results[1].classification).toBe('Individual');
+    expect(results[0].entity_type).toBe('Business');
+    expect(results[0].sic_code).toBe('1234');
+    expect(results[1].entity_type).toBe('Individual');
   });
 
   it('throws when job has no results yet', async () => {
