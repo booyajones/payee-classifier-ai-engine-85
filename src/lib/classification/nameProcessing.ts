@@ -1,5 +1,6 @@
 import { jaroWinklerSimilarity } from './stringMatching';
 import { NAME_SIMILARITY_THRESHOLD } from './config';
+import { fetchDedupeMap, upsertDedupeLinks } from '@/lib/backend';
 
 // Keep track of similar names for faster lookups
 const similarNameCache = new Map<string, string>();
@@ -71,12 +72,14 @@ export function getCanonicalName(name: string): string {
 }
 
 /**
- * Batch name deduplication using fuzzy matching
+ * Local batch name deduplication using fuzzy matching.
+ * This mirrors the previous implementation but is kept private
+ * so we can extend deduplication with persistent storage.
  */
-export function deduplicateNames(names: string[]): Map<string, string[]> {
+function localDeduplicateNames(names: string[]): Map<string, string[]> {
   const result = new Map<string, string[]>();
   const normalized = names.map(name => normalizePayeeName(name));
-  
+
   // First pass - exact matches after normalization
   const exactMatches = new Map<string, string[]>();
   normalized.forEach((norm, i) => {
@@ -85,15 +88,15 @@ export function deduplicateNames(names: string[]): Map<string, string[]> {
     }
     exactMatches.get(norm)?.push(names[i]);
   });
-  
+
   // Second pass - fuzzy matching for remaining unique normalized names
   const uniqueNormalized = Array.from(exactMatches.keys());
-  
+
   // Process each unique normalized name
   for (let i = 0; i < uniqueNormalized.length; i++) {
     const currentNorm = uniqueNormalized[i];
     let foundMatch = false;
-    
+
     // Check if this name is similar to any canonical name we've already processed
     for (const [canonicalName, group] of result.entries()) {
       if (areSimilarNames(currentNorm, canonicalName)) {
@@ -105,13 +108,56 @@ export function deduplicateNames(names: string[]): Map<string, string[]> {
         break;
       }
     }
-    
+
     // If no match found, create a new canonical group
     if (!foundMatch) {
       const originalNames = exactMatches.get(currentNorm) || [];
       result.set(currentNorm, [...originalNames]);
     }
   }
-  
+
+  return result;
+}
+
+/**
+ * Batch name deduplication that consults and persists dedupe links
+ */
+export async function deduplicateNames(names: string[]): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  const normalized = names.map(name => normalizePayeeName(name));
+
+  // Load existing dedupe links from database
+  const existingMap = await fetchDedupeMap(normalized);
+
+  const remaining: string[] = [];
+  normalized.forEach((norm, i) => {
+    const canonical = existingMap.get(norm);
+    if (canonical) {
+      if (!result.has(canonical)) result.set(canonical, []);
+      result.get(canonical)?.push(names[i]);
+    } else {
+      remaining.push(names[i]);
+    }
+  });
+
+  // Deduplicate remaining names locally
+  const newGroups = localDeduplicateNames(remaining);
+  newGroups.forEach((group, canonical) => {
+    if (!result.has(canonical)) result.set(canonical, []);
+    group.forEach(name => result.get(canonical)?.push(name));
+  });
+
+  // Persist new dedupe links
+  const links: { canonical_normalized: string; duplicate_normalized: string }[] = [];
+  newGroups.forEach((group, canonical) => {
+    group.forEach(name => {
+      const dupNorm = normalizePayeeName(name);
+      if (dupNorm !== canonical) {
+        links.push({ canonical_normalized: canonical, duplicate_normalized: dupNorm });
+      }
+    });
+  });
+  await upsertDedupeLinks(links);
+
   return result;
 }

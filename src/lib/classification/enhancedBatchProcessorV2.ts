@@ -34,7 +34,7 @@ export async function enhancedProcessBatchV2(
   const deduplicationMap = new Map<string, BatchRow[]>();
   
   if (config.useCacheForDuplicates) {
-    const nameGroups = deduplicateNames(payeeNames);
+    const nameGroups = await deduplicateNames(payeeNames);
     processedRows = [];
     
     nameGroups.forEach((originalNames, canonicalName) => {
