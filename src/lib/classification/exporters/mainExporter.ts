@@ -1,6 +1,7 @@
 import { logger } from '../../logger';
 
 import { ExportRow, ExportContext } from './types';
+import type { BatchProcessingResult, OriginalRow } from '../../types';
 import { createResultsMap, mergeRowWithResult } from './resultsMerger';
 import { createFallbackExportData } from './fallbackExporter';
 
@@ -11,7 +12,7 @@ import { createFallbackExportData } from './fallbackExporter';
  * @param includeAllColumns - If false, exclude original row fields and output only AI columns
  */
 export function exportResultsWithOriginalDataV3(
-  batchResult: any,
+  batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): ExportRow[] {
   logger.info('[MAIN EXPORTER] Processing batch result with GUARANTEED alignment:', {
@@ -30,7 +31,7 @@ export function exportResultsWithOriginalDataV3(
   // Create results map for efficient lookup by row index
   const resultsMap = createResultsMap(batchResult.results);
   
-  return batchResult.originalFileData.map((originalRow: any, index: number) => {
+  return batchResult.originalFileData.map((originalRow: OriginalRow, index: number) => {
     // Get the corresponding result by exact index match
     const result = resultsMap.get(index);
     return mergeRowWithResult(originalRow, result, index, includeAllColumns);

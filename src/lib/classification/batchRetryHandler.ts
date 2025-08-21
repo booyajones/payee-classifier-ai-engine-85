@@ -1,13 +1,13 @@
 import { logger } from '../logger';
 
-import { PayeeClassification } from '../types';
+import { PayeeClassification, OriginalRow } from '../types';
 import { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
 
 /**
  * Handle retry logic for failed batch items
  */
 export async function handleBatchRetries(
-  retryQueue: Array<{ name: string; originalIndex: number; originalData?: any }>
+  retryQueue: Array<{ name: string; originalIndex: number; originalData?: OriginalRow }>
 ): Promise<PayeeClassification[]> {
   if (retryQueue.length === 0) return [];
 
@@ -68,7 +68,7 @@ export async function handleBatchRetries(
 export function createFallbackClassification(
   payeeName: string,
   originalIndex: number,
-  originalData?: any
+  originalData?: OriginalRow
 ): PayeeClassification {
   const classification = payeeName.split(/\s+/).length <= 2 ? 'Individual' as const : 'Business' as const;
 

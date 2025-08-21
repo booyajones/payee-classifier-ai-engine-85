@@ -3,6 +3,7 @@ import { useState } from "react";
 import { parseUploadedFile } from "@/lib/fileValidation";
 import { validateFile, validatePayeeData } from "@/lib/fileValidation";
 import { ValidationResult, PayeeRecord } from "@/lib/fileValidation/types";
+import { OriginalRow } from "@/lib/types";
 import { handleError, showErrorToast } from "@/lib/errorHandler";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -12,7 +13,7 @@ export const useFileValidation = () => {
   const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [validationStatus, setValidationStatus] = useState<'none' | 'validating' | 'valid' | 'error'>('none');
   const [fileInfo, setFileInfo] = useState<{ rowCount?: number; payeeCount?: number } | null>(null);
-  const [originalFileData, setOriginalFileData] = useState<any[]>([]);
+  const [originalFileData, setOriginalFileData] = useState<OriginalRow[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const { toast } = useToast();
@@ -81,7 +82,7 @@ export const useFileValidation = () => {
         setSelectedColumn(payeeColumn);
       }
 
-      const fullData: any[] = [];
+      const fullData: OriginalRow[] = [];
       const payees: PayeeRecord[] = [];
       for await (const row of rows) {
         fullData.push(row);

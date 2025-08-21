@@ -1,12 +1,13 @@
 import { logger } from '../../logger';
 
 import { ExportRow, ExportContext } from './types';
+import type { PayeeClassification, OriginalRow } from '../../types';
 
 /**
  * Creates a results map for efficient lookup by row index with validation
  */
-export function createResultsMap(results: any[]): Map<number, any> {
-  const resultsMap = new Map<number, any>();
+export function createResultsMap(results: PayeeClassification[]): Map<number, PayeeClassification> {
+  const resultsMap = new Map<number, PayeeClassification>();
   const seenIndices = new Set<number>();
   
   logger.info('[RESULTS MERGER] Creating results map with validation');
@@ -41,8 +42,8 @@ export function createResultsMap(results: any[]): Map<number, any> {
  * Merges original row data with AI classification results with perfect alignment
  */
 export function mergeRowWithResult(
-  originalRow: any,
-  result: any | undefined,
+  originalRow: OriginalRow,
+  result: PayeeClassification | undefined,
   index: number,
   includeAllColumns: boolean = true
 ): ExportRow {

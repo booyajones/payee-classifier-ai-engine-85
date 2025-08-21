@@ -1,6 +1,6 @@
 import { logger } from '../logger';
 
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
+import { PayeeClassification, BatchProcessingResult, ClassificationConfig, OriginalRow } from '../types';
 import { balancedClassifyPayeeWithAI } from '../openai/balancedClassification';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
 import { processPayeeDeduplicationFixed, createDuplicateResults } from './fixedDeduplication';
@@ -11,7 +11,7 @@ import { processPayeeDeduplicationFixed, createDuplicateResults } from './fixedD
 export async function fixedProcessBatch(
   payeeNames: string[],
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG,
-  originalFileData?: any[]
+  originalFileData?: OriginalRow[]
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   

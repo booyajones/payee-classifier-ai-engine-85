@@ -1,11 +1,12 @@
 import { logger } from '../../logger';
 
 import { ExportRow } from './types';
+import type { PayeeClassification } from '../../types';
 
 /**
  * Creates export data from results only when no original file data is available
  */
-export function createFallbackExportData(results: any[]): ExportRow[] {
+export function createFallbackExportData(results: PayeeClassification[]): ExportRow[] {
   logger.info('[FALLBACK EXPORTER] No original file data, creating export from results only');
 
   return results.map((result, index) => {

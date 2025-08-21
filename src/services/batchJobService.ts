@@ -1,6 +1,8 @@
 
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { StoredBatchJob, isValidBatchJobId } from '@/lib/storage/batchJobStorage';
+import { OriginalRow } from '@/lib/types';
+import { ORIGINAL_FILE_DATA_LIMIT } from '@/lib/storage/config';
 import { logger } from '@/lib/logger';
 
 // Use the same storage key as the rest of the system
@@ -102,7 +104,7 @@ class BatchJobService {
     return jobs;
   }
 
-  async addJob(batchJob: BatchJob, payeeNames: string[], originalFileData: any[]): Promise<void> {
+  async addJob(batchJob: BatchJob, payeeNames: string[], originalFileData: OriginalRow[]): Promise<void> {
     if (!isValidBatchJobId(batchJob.id)) {
       throw new Error(`Invalid batch job ID format: ${batchJob.id}`);
     }
@@ -110,7 +112,7 @@ class BatchJobService {
     const storedJob: StoredBatchJob = {
       ...batchJob,
       payeeNames,
-      originalFileData: originalFileData.length < 1000 ? originalFileData : [],
+      originalFileData: originalFileData.length < ORIGINAL_FILE_DATA_LIMIT ? originalFileData : [],
       created_at: Date.now()
     };
 

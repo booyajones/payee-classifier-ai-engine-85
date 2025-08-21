@@ -1,6 +1,6 @@
 import { logger } from '../logger';
 
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig, EnhancedBatchStatistics } from '../types';
+import { PayeeClassification, BatchProcessingResult, ClassificationConfig, EnhancedBatchStatistics, OriginalRow } from '../types';
 import { enhancedClassifyPayeeV2 } from './enhancedClassificationV2';
 import { deduplicateNames } from './nameProcessing';
 import { bulkKeywordExclusion } from './enhancedKeywordExclusion';
@@ -8,7 +8,7 @@ import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
 
 export interface BatchRow {
   payeeName: string;
-  originalData: any;
+  originalData: OriginalRow;
   rowIndex: number;
 }
 

@@ -1,12 +1,13 @@
 
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { logger } from '@/lib/logger';
+import { OriginalRow } from '@/lib/types';
 
 const STORAGE_KEY = 'lovable_batch_jobs';
 
 export interface StoredBatchJob extends BatchJob {
   payeeNames: string[];
-  originalFileData: any[];
+  originalFileData: OriginalRow[];
   created_at: number; // Changed from createdAt to created_at
   isMockJob?: boolean;
 }
@@ -46,7 +47,7 @@ export function loadBatchJobs(): StoredBatchJob[] {
 /**
  * Add a new batch job to storage
  */
-export function addBatchJob(job: BatchJob, payeeNames: string[], originalFileData: any[], isMockJob: boolean = false): void {
+export function addBatchJob(job: BatchJob, payeeNames: string[], originalFileData: OriginalRow[], isMockJob: boolean = false): void {
   const jobs = loadBatchJobs();
   const storedJob: StoredBatchJob = {
     ...job,

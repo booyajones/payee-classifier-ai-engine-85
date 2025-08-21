@@ -1,3 +1,5 @@
+import { OriginalRow } from '../types';
+
 export interface PayeeRecord {
   raw_name: string;
   norm_name: string;
@@ -6,7 +8,7 @@ export interface PayeeRecord {
 export interface ValidationResult {
   payees: PayeeRecord[];
   payeeNames: string[]; // raw names for backward compatibility
-  originalData: any[];
+  originalData: OriginalRow[];
   payeeColumnName?: string;
   error?: Error;
 }

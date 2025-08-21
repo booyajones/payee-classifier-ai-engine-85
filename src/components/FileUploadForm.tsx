@@ -9,10 +9,11 @@ import ValidationErrorDisplay from "./file-upload/ValidationErrorDisplay";
 import ColumnSelector from "./file-upload/ColumnSelector";
 import FileUploadActions from "./file-upload/FileUploadActions";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
+import { OriginalRow } from "@/lib/types";
 import { useToast } from "@/components/ui/use-toast";
 
 interface FileUploadFormProps {
-  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
+  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: OriginalRow[]) => void;
   isProcessing?: boolean;
 }
 

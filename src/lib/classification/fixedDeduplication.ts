@@ -1,18 +1,18 @@
 import { logger } from '../logger';
 
-import { PayeeClassification } from '../types';
+import { PayeeClassification, OriginalRow } from '../types';
 
 /**
  * Fixed deduplication that maintains perfect 1:1 correspondence
  */
 export function processPayeeDeduplicationFixed(
   payeeNames: string[],
-  originalFileData?: any[]
+  originalFileData?: OriginalRow[]
 ): {
-  processQueue: Array<{ name: string; originalIndex: number; originalData?: any }>;
+  processQueue: Array<{ name: string; originalIndex: number; originalData?: OriginalRow }>;
   exactDuplicates: Map<string, number>; // Maps duplicate names to their first occurrence index
 } {
-  const processQueue: Array<{ name: string; originalIndex: number; originalData?: any }> = [];
+  const processQueue: Array<{ name: string; originalIndex: number; originalData?: OriginalRow }> = [];
   const exactDuplicates = new Map<string, number>();
   const seenNames = new Map<string, number>(); // Map normalized name to first occurrence index
 
@@ -55,7 +55,7 @@ export function createDuplicateResults(
   originalResults: PayeeClassification[],
   exactDuplicates: Map<string, number>,
   payeeNames: string[],
-  originalFileData?: any[]
+  originalFileData?: OriginalRow[]
 ): PayeeClassification[] {
   const duplicateResults: PayeeClassification[] = [];
   

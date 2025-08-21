@@ -1,5 +1,5 @@
 
-import { PayeeClassification } from '../types';
+import { PayeeClassification, OriginalRow } from '../types';
 import { calculateCombinedSimilarity } from './stringMatching';
 import { normalizePayeeName } from './nameProcessing';
 import { logger } from '../logger';
@@ -9,18 +9,18 @@ import { logger } from '../logger';
  */
 export function processPayeeDeduplication(
   payeeNames: string[],
-  originalFileData?: any[],
+  originalFileData?: OriginalRow[],
   useFuzzyMatching = true,
   similarityThreshold = 90
 ): {
-  processQueue: Array<{ name: string; normalizedName: string; originalIndex: number; originalData?: any }>;
+  processQueue: Array<{ name: string; normalizedName: string; originalIndex: number; originalData?: OriginalRow }>;
   results: PayeeClassification[];
   duplicateCache: Map<string, PayeeClassification>;
 } {
   const results: PayeeClassification[] = [];
   const processed = new Set<string>();
   const duplicateCache = new Map<string, PayeeClassification>();
-  const processQueue: Array<{ name: string; normalizedName: string; originalIndex: number; originalData?: any }> = [];
+  const processQueue: Array<{ name: string; normalizedName: string; originalIndex: number; originalData?: OriginalRow }> = [];
   const normalizationCache = new Map<string, string>();
 
   for (let i = 0; i < payeeNames.length; i++) {

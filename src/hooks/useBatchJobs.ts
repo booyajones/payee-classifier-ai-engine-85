@@ -3,6 +3,8 @@ import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { StoredBatchJob } from '@/lib/storage/batchJobStorage';
 import { batchJobService } from '@/services/batchJobService';
 import { logger } from '@/lib/logger';
+import { OriginalRow } from '@/lib/types';
+import { ORIGINAL_FILE_DATA_LIMIT } from '@/lib/storage/config';
 
 export const useBatchJobs = () => {
   const [batchJobs, setBatchJobs] = useState<StoredBatchJob[]>([]);
@@ -42,7 +44,7 @@ export const useBatchJobs = () => {
     }
   };
 
-  const addJob = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => {
+  const addJob = async (batchJob: BatchJob, payeeNames: string[], originalFileData: OriginalRow[]) => {
     try {
       logger.info(`[USE BATCH JOBS] === STARTING ADD JOB PROCESS ===`);
       logger.info(`[USE BATCH JOBS] Adding job: ${batchJob.id}`);
@@ -53,7 +55,7 @@ export const useBatchJobs = () => {
       const newStoredJob: StoredBatchJob = {
         ...batchJob,
         payeeNames,
-        originalFileData: originalFileData.length < 1000 ? originalFileData : [],
+        originalFileData: originalFileData.length < ORIGINAL_FILE_DATA_LIMIT ? originalFileData : [],
         created_at: Date.now()
       };
       

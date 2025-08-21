@@ -1,6 +1,6 @@
 import { logger } from '../logger';
 
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
+import { PayeeClassification, BatchProcessingResult, ClassificationConfig, OriginalRow } from '../types';
 import { balancedClassifyPayeeWithAI } from '../openai/balancedClassification';
 import { checkKeywordExclusion, getComprehensiveExclusionKeywords } from './keywordExclusion';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
@@ -10,7 +10,7 @@ import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
  * No deduplication, no caching - pure row-by-row processing with perfect index alignment
  */
 export async function cleanProcessBatch(
-  originalFileData: any[],
+  originalFileData: OriginalRow[],
   selectedColumn: string,
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG
 ): Promise<BatchProcessingResult> {

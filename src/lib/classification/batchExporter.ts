@@ -1,4 +1,4 @@
-import { BatchProcessingResult } from '../types';
+import { BatchProcessingResult, OriginalRow, PayeeClassification } from '../types';
 import { normalizePayeeName } from './nameProcessing';
 import { calculateCombinedSimilarity } from './stringMatching';
 import { logger } from '../logger';
@@ -7,8 +7,8 @@ import { logger } from '../logger';
  * Validate that payee names match between results and original data
  */
 function validateDataAlignment(
-  originalFileData: any[],
-  results: any[],
+  originalFileData: OriginalRow[],
+  results: PayeeClassification[],
   payeeColumnName?: string
 ): { isValid: boolean; mismatches: Array<{ rowIndex: number; originalName: string; resultName: string }> } {
   const mismatches: Array<{ rowIndex: number; originalName: string; resultName: string }> = [];
@@ -54,10 +54,10 @@ function validateDataAlignment(
  */
 export function findResultByName(
   payeeName: string,
-  results: any[],
+  results: PayeeClassification[],
   preferredIndex?: number,
   similarityThreshold: number = 80
-): any | null {
+): PayeeClassification | null {
   const normalizedTargetName = normalizePayeeName(payeeName);
 
   // Gather all exact matches

@@ -1,5 +1,5 @@
 import { logger } from '../logger';
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
+import { PayeeClassification, BatchProcessingResult, ClassificationConfig, OriginalRow } from '../types';
 import { DEFAULT_CLASSIFICATION_CONFIG, MAX_CONCURRENCY } from './config';
 import { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
 import { processPayeeDeduplication } from './batchDeduplication';
@@ -16,7 +16,7 @@ import { upsertDedupeLinks } from '@/lib/backend';
 export async function enhancedProcessBatchV3(
   payeeNames: string[],
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG,
-  originalFileData?: any[]
+  originalFileData?: OriginalRow[]
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   

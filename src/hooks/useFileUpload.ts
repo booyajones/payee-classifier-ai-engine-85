@@ -4,10 +4,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { logger } from "@/lib/logger";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
+import { OriginalRow } from "@/lib/types";
 import { createHash } from "crypto";
 
 interface UseFileUploadProps {
-  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
+  onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: OriginalRow[]) => void;
 }
 
 export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
@@ -99,7 +100,7 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
 
       const hashName = (name: string) =>
         createHash("sha256").update(name).digest("hex");
-      const uniqueMap = new Map<string, { raw: string; row: any }>();
+      const uniqueMap = new Map<string, { raw: string; row: OriginalRow }>();
       validationResult.payees.forEach((p: any, idx: number) => {
         const hash = hashName(p.norm_name);
         if (!uniqueMap.has(hash)) {

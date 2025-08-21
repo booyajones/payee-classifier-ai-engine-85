@@ -1,6 +1,6 @@
 import { logger } from '../logger';
 
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
+import { PayeeClassification, BatchProcessingResult, ClassificationConfig, OriginalRow } from '../types';
 import { balancedClassifyPayeeWithAI } from '../openai/balancedClassification';
 import { checkKeywordExclusion, getComprehensiveExclusionKeywords } from './keywordExclusion';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
@@ -16,7 +16,7 @@ export interface ProgressCallback {
 }
 
 export async function enhancedCleanProcessBatch(
-  originalFileData: any[],
+  originalFileData: OriginalRow[],
   selectedColumn: string,
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG,
   onProgress?: ProgressCallback

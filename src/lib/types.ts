@@ -25,12 +25,16 @@ export interface KeywordExclusionResult {
   reasoning: string;
 }
 
+export interface OriginalRow {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 export interface PayeeClassification {
   id: string;
   payeeName: string;
   result: ClassificationResult;
   timestamp: Date;
-  originalData?: any; // For preserving original file data
+  originalData?: OriginalRow; // For preserving original file data
   rowIndex?: number; // For maintaining order from original file
 }
 
@@ -39,7 +43,7 @@ export interface BatchProcessingResult {
   successCount: number;
   failureCount: number;
   processingTime?: number;
-  originalFileData?: any[]; // Preserve original file structure
+  originalFileData?: OriginalRow[]; // Preserve original file structure
   enhancedStats?: EnhancedBatchStatistics;
 }
 

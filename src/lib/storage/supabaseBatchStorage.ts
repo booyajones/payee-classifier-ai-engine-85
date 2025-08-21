@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { BatchJob } from '@/lib/openai/trueBatchAPI';
 import { StoredBatchJob } from './batchJobStorage';
 import { logger } from '@/lib/logger';
+import { OriginalRow } from '@/lib/types';
 
 // Initialize Supabase client (users will need to set these in their environment)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -19,7 +20,7 @@ export interface SupabaseBatchJob {
   user_id?: string;
   job_data: any;
   payee_names: string[];
-  original_file_data: any[];
+  original_file_data: OriginalRow[];
   created_at: string;
   updated_at: string;
   status: string;

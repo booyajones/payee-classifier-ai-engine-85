@@ -7,7 +7,7 @@ import BatchJobManager from "./BatchJobManager";
 import BatchResultsDisplay from "./BatchResultsDisplay";
 import FileUploadForm from "./FileUploadForm";
 import APIKeyInput from "./APIKeyInput";
-import { PayeeClassification, BatchProcessingResult } from "@/lib/types";
+import { PayeeClassification, BatchProcessingResult, OriginalRow } from "@/lib/types";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
 import { exportResultsFixed } from "@/lib/classification/fixedExporter";
@@ -64,7 +64,7 @@ const BatchClassificationForm = ({ onComplete, onApiKeySet, onApiKeyChange }: Ba
     checkApiKey();
   }, [toast]);
 
-  const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: any[] = []) => {
+  const handleBatchJobCreated = async (batchJob: BatchJob, payeeNames: string[], originalFileData: OriginalRow[] = []) => {
     logger.info(`[BATCH FORM] === HANDLING BATCH JOB CREATION ===`);
     logger.info(`[BATCH FORM] Received batch job: ${batchJob.id.slice(-8)}`);
     logger.info(`[BATCH FORM] Payee count: ${payeeNames.length}`);

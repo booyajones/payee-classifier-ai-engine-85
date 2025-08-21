@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { PayeeClassification, ClassificationResult, BatchProcessingResult } from "@/lib/types"
+import { PayeeClassification, ClassificationResult, BatchProcessingResult, OriginalRow } from "@/lib/types"
 import { exportResultsWithOriginalDataV3 } from "@/lib/classification/exporters"
 
 export function cn(...inputs: ClassValue[]) {
@@ -8,9 +8,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function createPayeeClassification(
-  payeeName: string, 
+  payeeName: string,
   result: ClassificationResult,
-  originalData?: any,
+  originalData?: OriginalRow,
   rowIndex?: number
 ): PayeeClassification {
   return {

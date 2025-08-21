@@ -1,5 +1,5 @@
 
-import { BatchProcessingResult } from '../../types';
+import { BatchProcessingResult, PayeeClassification } from '../../types';
 
 export interface ExportRow {
   [key: string]: any;
@@ -28,5 +28,5 @@ export interface ExportOptions {
 export interface ExportContext {
   batchResult: BatchProcessingResult;
   options: ExportOptions;
-  resultsMap: Map<number, any>;
+  resultsMap: Map<number, PayeeClassification>;
 }
