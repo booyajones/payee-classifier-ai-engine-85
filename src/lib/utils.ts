@@ -14,7 +14,7 @@ export function createPayeeClassification(
   rowIndex?: number
 ): PayeeClassification {
   return {
-    id: `payee-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `payee-${Date.now()}-${crypto.randomUUID()}`,
     payeeName,
     result,
     timestamp: new Date(),
