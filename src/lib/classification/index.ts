@@ -9,13 +9,13 @@ export * from './batchProcessing';
 export * from './utils';
 
 // Export specific functions from enhancedRules to avoid conflicts
-export { 
-  detectBusinessByExtendedRules, 
-  detectIndividualByExtendedRules 
+export {
+  detectBusinessByExtendedRules,
+  detectIndividualByExtendedRules
 } from './enhancedRules';
 
 // Export specific functions from stringMatching to avoid conflicts
-export { 
+export {
   levenshteinDistance,
   jaroWinklerSimilarity,
   diceCoefficient,
@@ -27,18 +27,14 @@ export {
 // Export specific functions from enhancedClassification but exclude enhancedProcessBatch to avoid conflict
 export { enhancedClassifyPayee } from './enhancedClassification';
 
-// Export enhanced V2 functions
+// Export enhanced classification versions
 export { enhancedClassifyPayeeV2 } from './enhancedClassificationV2';
-export { enhancedProcessBatchV2, exportResultsWithOriginalData } from './enhancedBatchProcessorV2';
-
-// Export new V3 functions (no failures, intelligent escalation)
 export { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
-export { enhancedProcessBatchV3 } from './enhancedBatchProcessorV3';
 
 // Export new enhanced keyword exclusion (avoid conflict with old one)
-export { 
+export {
   checkKeywordExclusion as checkEnhancedKeywordExclusion,
-  bulkKeywordExclusion 
+  bulkKeywordExclusion
 } from './enhancedKeywordExclusion';
 
 // Export name processing
@@ -54,3 +50,4 @@ export { findResultByName } from './batchExporter';
 
 // Export from the new exporters module (includes the main export function)
 export * from './exporters';
+

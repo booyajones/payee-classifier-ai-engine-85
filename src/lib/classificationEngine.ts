@@ -14,9 +14,9 @@ export { processBatch } from './classification/batchProcessing';
 export { checkKeywordExclusion } from './classification/keywordExclusion';
 
 // Export new enhanced keyword exclusion with different name to avoid conflict
-export { 
+export {
   checkKeywordExclusion as checkEnhancedKeywordExclusion,
-  bulkKeywordExclusion 
+  bulkKeywordExclusion
 } from './classification/enhancedKeywordExclusion';
 
 export * from './openai/batchAPI';
@@ -25,19 +25,15 @@ export * from './openai/batchAPI';
 export * from './openai/trueBatchAPI';
 export * from './openai/hybridBatchProcessor';
 
-// Export enhanced V2 functions
+// Export enhanced classification versions
 export { enhancedClassifyPayeeV2 } from './classification/enhancedClassificationV2';
-export { enhancedProcessBatchV2, exportResultsWithOriginalData } from './classification/enhancedBatchProcessorV2';
-
-// Export new V3 functions (NO FAILURES, intelligent escalation)
 export { enhancedClassifyPayeeV3 } from './classification/enhancedClassificationV3';
-export { enhancedProcessBatchV3 } from './classification/enhancedBatchProcessorV3';
 
 // Export comprehensive data exporter - updated to use exporters module
 export { exportResultsWithOriginalDataV3 } from './classification/exporters';
 
 // Export string matching functions explicitly to avoid conflicts
-export { 
+export {
   levenshteinDistance,
   jaroWinklerSimilarity,
   diceCoefficient,
@@ -45,3 +41,4 @@ export {
   calculateCombinedSimilarity,
   advancedNormalization
 } from './classification/stringMatching';
+
