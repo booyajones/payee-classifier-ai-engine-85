@@ -1,11 +1,37 @@
 import { getOpenAIClient } from './client';
 import { timeoutPromise } from './utils';
-import { DEFAULT_API_TIMEOUT, CLASSIFICATION_MODEL, MAX_PARALLEL_BATCHES } from './config';
+import {
+  DEFAULT_API_TIMEOUT,
+  CLASSIFICATION_MODEL,
+  MAX_PARALLEL_BATCHES,
+  MAX_TOKENS,
+  MAX_ITEMS_PER_REQUEST
+} from './config';
 import { logger } from '../logger';
 
-export const OPTIMIZED_BATCH_SIZE = 10; // Reduced for better reliability
 export const MAX_RETRIES = 2;
 export const RETRY_DELAY_BASE = 1000;
+
+const PROMPT_OVERHEAD_TOKENS = 100; // Rough estimate of system/prompt tokens
+
+interface BatchItem {
+  original: string;
+  processed: string;
+  tokens: number;
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil((text?.length || 0) / 4);
+}
+
+function preprocessPayeeDescription(name: string, maxTokens: number): string {
+  const tokens = estimateTokens(name);
+  if (tokens <= maxTokens) {
+    return name;
+  }
+  const maxChars = maxTokens * 4;
+  return name.slice(0, maxChars) + '…';
+}
 
 interface CachedResult {
   classification: 'Business' | 'Individual';
@@ -304,7 +330,7 @@ function validateApiResponse(content: string, expectedCount: number): any[] {
  * Process a single batch of payee names with retry and caching
  */
 async function processBatch(
-  batchNames: string[],
+  batchItems: BatchItem[],
   batchNumber: number,
   openaiClient: any, // Fixed: Changed from Promise<OpenAI> to any to match usage
   timeout: number
@@ -315,14 +341,17 @@ async function processBatch(
   reasoning: string;
   source: 'api';
 }>> {
-  logger.info(`[OPTIMIZED] Processing batch ${batchNumber} with ${batchNames.length} names`);
+  logger.info(`[OPTIMIZED] Processing batch ${batchNumber} with ${batchItems.length} names`);
 
   try {
     const batchResults = await withRetry(async () => {
-      const prompt = `Classify each payee name as "Business" or "Individual". Return ONLY a JSON array:\n` +
+      const prompt =
+        `Classify each payee name as "Business" or "Individual". Return ONLY a JSON array:\n` +
         `[\n  {"name": "payee_name", "classification": "Business", "confidence": 95, "reasoning": "brief reason"},\n` +
         `  {"name": "next_payee", "classification": "Individual", "confidence": 90, "reasoning": "brief reason"}\n]\n\n` +
-        `Names to classify:\n${batchNames.map((name, idx) => `${idx + 1}. "${name}"`).join('\n')}`;
+        `Names to classify:\n${batchItems
+          .map((item, idx) => `${idx + 1}. "${item.processed}"`)
+          .join('\n')}`;
 
       const apiCall = openaiClient.chat.completions.create({
         model: CLASSIFICATION_MODEL,
@@ -344,7 +373,7 @@ async function processBatch(
       throw new Error('No response content from OpenAI API');
     }
 
-    const validatedClassifications = validateApiResponse(content, batchNames.length);
+    const validatedClassifications = validateApiResponse(content, batchItems.length);
 
     const batchOutput: Array<{
       payeeName: string;
@@ -355,8 +384,8 @@ async function processBatch(
     }> = [];
 
     validatedClassifications.forEach((result, index) => {
-      if (index < batchNames.length) {
-        const originalName = batchNames[index];
+      if (index < batchItems.length) {
+        const originalName = batchItems[index].original;
         const classificationResult = {
           payeeName: originalName,
           classification: result.classification as 'Business' | 'Individual',
@@ -382,9 +411,9 @@ async function processBatch(
       }
     });
 
-    if (validatedClassifications.length < batchNames.length) {
-      for (let j = validatedClassifications.length; j < batchNames.length; j++) {
-        const missingName = batchNames[j];
+    if (validatedClassifications.length < batchItems.length) {
+      for (let j = validatedClassifications.length; j < batchItems.length; j++) {
+        const missingName = batchItems[j].original;
         if (missingName) {
           batchOutput.push(createFallbackResult(missingName, 'Incomplete API response'));
         }
@@ -402,9 +431,14 @@ async function processBatch(
       reasoning: string;
       source: 'api';
     }> = [];
-    batchNames.forEach(name => {
-      if (name) {
-        fallback.push(createFallbackResult(name, error instanceof Error ? error.message : 'Unknown error'));
+    batchItems.forEach(item => {
+      if (item.original) {
+        fallback.push(
+          createFallbackResult(
+            item.original,
+            error instanceof Error ? error.message : 'Unknown error'
+          )
+        );
       }
     });
     return fallback;
@@ -478,15 +512,38 @@ export async function optimizedBatchClassification(
 
   // Step 2: Process uncached names in batches with controlled concurrency
   if (uncachedNames.length > 0) {
-    const batches: string[][] = [];
-    for (let i = 0; i < uncachedNames.length; i += OPTIMIZED_BATCH_SIZE) {
-      batches.push(uncachedNames.slice(i, i + OPTIMIZED_BATCH_SIZE));
+    const maxItemTokens = Math.floor(MAX_TOKENS / MAX_ITEMS_PER_REQUEST);
+    const items: BatchItem[] = uncachedNames.map(name => {
+      const processed = preprocessPayeeDescription(name, maxItemTokens);
+      return { original: name, processed, tokens: estimateTokens(processed) };
+    });
+
+    const batches: BatchItem[][] = [];
+    let currentBatch: BatchItem[] = [];
+    let currentTokens = PROMPT_OVERHEAD_TOKENS;
+
+    items.forEach(item => {
+      if (
+        currentBatch.length >= MAX_ITEMS_PER_REQUEST ||
+        currentTokens + item.tokens > MAX_TOKENS
+      ) {
+        if (currentBatch.length > 0) {
+          batches.push(currentBatch);
+        }
+        currentBatch = [];
+        currentTokens = PROMPT_OVERHEAD_TOKENS;
+      }
+      currentBatch.push(item);
+      currentTokens += item.tokens;
+    });
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
     }
 
     let active: Promise<Array<{ payeeName: string; classification: 'Business' | 'Individual'; confidence: number; reasoning: string; source: 'api'; }>>[] = [];
 
     for (let i = 0; i < batches.length; i++) {
-      active.push(processBatch(batches[i], i + 1, openaiClient, timeout)); // Fixed: Pass the resolved client
+      active.push(processBatch(batches[i], i + 1, openaiClient, timeout));
       if (active.length === MAX_PARALLEL_BATCHES || i === batches.length - 1) {
         const resolved = await Promise.all(active);
         resolved.forEach(r => results.push(...r));
