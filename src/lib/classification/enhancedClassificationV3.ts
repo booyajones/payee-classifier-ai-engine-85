@@ -3,6 +3,7 @@ import { ClassificationResult, ClassificationConfig, SimilarityScores } from '..
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
 import { checkKeywordExclusion } from './enhancedKeywordExclusion';
 import { calculateCombinedSimilarity, advancedNormalization, levenshteinSimilarity } from './stringMatching';
+import { normalizePayeeName } from './nameProcessing';
 import { applyRuleBasedClassification } from './ruleBasedClassification';
 import { applyNLPClassification } from './nlpClassification';
 import { consensusClassification } from '../openai/enhancedClassification';
@@ -150,9 +151,13 @@ async function performAdvancedFuzzyMatching(payeeName: string): Promise<Classifi
     
     if (cachedNames.length === 0) return null;
     
-    // Calculate similarities using multiple algorithms
+    // Normalize payee name once for comparison
+    const normalizedPayee = normalizePayeeName(payeeName);
+
+    // Calculate similarities using multiple algorithms on normalized names
     const similarities = cachedNames.map(cachedName => {
-      const scores = calculateCombinedSimilarity(payeeName, cachedName);
+      const normalizedCached = normalizePayeeName(cachedName);
+      const scores = calculateCombinedSimilarity(normalizedPayee, normalizedCached);
       return {
         name: cachedName,
         scores,
@@ -169,7 +174,7 @@ async function performAdvancedFuzzyMatching(payeeName: string): Promise<Classifi
       return {
         classification: bestMatch.result.result.classification,
         confidence: Math.min(bestMatch.scores.combined, CONFIDENCE_THRESHOLDS.HIGH_CONFIDENCE),
-        reasoning: `High-confidence fuzzy match with "${bestMatch.name}" (${bestMatch.scores.combined.toFixed(1)}% similarity)`,
+        reasoning: `High-confidence fuzzy match between "${payeeName}" and "${bestMatch.name}" (${bestMatch.scores.combined.toFixed(1)}% similarity)`,
         processingTier: 'Rule-Based',
         similarityScores: bestMatch.scores,
         processingMethod: 'Advanced fuzzy matching'
