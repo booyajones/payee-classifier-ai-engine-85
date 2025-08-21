@@ -186,7 +186,7 @@ export function detectBusinessByExtendedRules(payeeName: string): { isMatch: boo
     { pattern: /\b(POOL|POOLS|MAINTENANCE|GAS|PROPANE|HVAC|TRAVEL|PRO|DESIGNS|PLANNERS|EVENTS|DISTRIBUTORS|ENTERTAINMENT|SURFACE|HOTEL|IMAGE|BAKERY|RESTAURANT|CAFE|GRAPHICS|CREATIVE|MECHANICAL)\b/i, rule: 'Industry/service term' },
     { pattern: /\b(AIR|DELTA|AMERICAN|ADVANCED|EXPERT|CLEAN|CRUISE|CURATED|FLORAL)\b/i, rule: 'Business descriptor' },
     { pattern: /\b(AT|BY)\b/i, rule: 'Business relationship term' },
-    { pattern: /\&/i, rule: 'Ampersand (common in business names)' },
+      { pattern: /&/i, rule: 'Ampersand (common in business names)' },
     { pattern: /\//i, rule: 'Forward slash (common in business partnerships)' }
   ];
 
@@ -262,66 +262,3 @@ export function detectIndividualByExtendedRules(payeeName: string): { isMatch: b
   return { isMatch: matchingRules.length > 0, rules: matchingRules };
 }
 
-/**
- * Calculate text similarity using Jaro-Winkler distance
- * Useful for fuzzy name matching
- */
-export function jaroWinklerSimilarity(s1: string, s2: string): number {
-  // Simple implementation of Jaro-Winkler distance
-  if (s1 === s2) return 1.0;
-  
-  s1 = s1.toUpperCase();
-  s2 = s2.toUpperCase();
-  
-  const m = Math.min(s1.length, s2.length);
-  const matchDistance = Math.floor(Math.max(s1.length, s2.length) / 2) - 1;
-  
-  let matches = 0;
-  let transpositions = 0;
-  
-  const s1Matches: boolean[] = Array(s1.length).fill(false);
-  const s2Matches: boolean[] = Array(s2.length).fill(false);
-  
-  // Count matches
-  for (let i = 0; i < s1.length; i++) {
-    const start = Math.max(0, i - matchDistance);
-    const end = Math.min(i + matchDistance + 1, s2.length);
-    
-    for (let j = start; j < end; j++) {
-      if (!s2Matches[j] && s1[i] === s2[j]) {
-        s1Matches[i] = true;
-        s2Matches[j] = true;
-        matches++;
-        break;
-      }
-    }
-  }
-  
-  if (matches === 0) return 0;
-  
-  // Count transpositions
-  let k = 0;
-  for (let i = 0; i < s1.length; i++) {
-    if (s1Matches[i]) {
-      while (!s2Matches[k]) k++;
-      if (s1[i] !== s2[k]) transpositions++;
-      k++;
-    }
-  }
-  
-  // Jaro similarity
-  const jaroSimilarity = (
-    matches / s1.length +
-    matches / s2.length +
-    (matches - transpositions / 2) / matches
-  ) / 3;
-  
-  // Winkler modification
-  let prefixLength = 0;
-  for (let i = 0; i < Math.min(s1.length, s2.length, 4); i++) {
-    if (s1[i] === s2[i]) prefixLength++;
-    else break;
-  }
-  
-  return jaroSimilarity + prefixLength * 0.1 * (1 - jaroSimilarity);
-}

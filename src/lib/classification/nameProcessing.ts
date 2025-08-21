@@ -1,4 +1,4 @@
-import { jaroWinklerSimilarity } from './enhancedRules';
+import { jaroWinklerSimilarity } from './stringMatching';
 import { NAME_SIMILARITY_THRESHOLD } from './config';
 
 // Keep track of similar names for faster lookups
@@ -16,7 +16,7 @@ export function normalizePayeeName(name: string): string {
     // Normalize UTF-8 characters
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     // Remove common punctuation
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ')
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
     // Replace multiple spaces with a single space
     .replace(/\s+/g, ' ')
     // Trim leading/trailing whitespace
@@ -48,7 +48,7 @@ export function areSimilarNames(name1: string, name2: string): boolean {
   }
   
   // Calculate Jaro-Winkler similarity (0-100%)
-  const similarity = jaroWinklerSimilarity(normalized1, normalized2) * 100;
+  const similarity = jaroWinklerSimilarity(normalized1, normalized2);
   
   // Names are similar if similarity is above threshold
   return similarity >= NAME_SIMILARITY_THRESHOLD;
