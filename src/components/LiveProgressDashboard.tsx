@@ -42,10 +42,10 @@ const LiveProgressDashboard = () => {
         {activeJobs.map((job) => {
           const progress = job.totalRows > 0 ? (job.processedRows / job.totalRows) * 100 : 0;
           const elapsedTime = (Date.now() - job.startTime) / 1000;
-          const estimatedTotal = job.processingSpeed && job.processingSpeed > 0 
-            ? (job.totalRows / job.processingSpeed) * 60 
+          const estimatedTotal = job.processingSpeed && job.processingSpeed > 0
+            ? (job.totalRows / job.processingSpeed) * 60
             : 0;
-          const remainingTime = estimatedTotal - elapsedTime;
+          const remainingTime = job.eta ?? (estimatedTotal - elapsedTime);
 
           return (
             <div key={job.id} className="border rounded-lg p-4 space-y-3">
@@ -94,24 +94,18 @@ const LiveProgressDashboard = () => {
                 <Progress value={progress} className="h-2" />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>AI Processed: {job.aiProcessedCount}</span>
+                  <span>Queued: {job.queued ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <span>Excluded: {job.excludedCount}</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Running: {job.running ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span>Errors: {job.errorCount}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Zap className="h-3 w-3" />
-                  <span>
-                    {job.processingSpeed ? `${job.processingSpeed.toFixed(1)} rows/min` : 'Calculating...'}
-                  </span>
+                  <span>Failed: {job.failed ?? 0}</span>
                 </div>
               </div>
 
