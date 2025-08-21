@@ -1,5 +1,5 @@
 
-import { PayeeClassification } from '../types';
+import { PayeeClassification, SimilarityWeights } from '../types';
 import { calculateCombinedSimilarity } from './stringMatching';
 
 /**
@@ -9,7 +9,8 @@ export function processPayeeDeduplication(
   payeeNames: string[],
   originalFileData?: any[],
   useFuzzyMatching = true,
-  similarityThreshold = 90
+  similarityThreshold = 90,
+  similarityWeights?: SimilarityWeights
 ): {
   processQueue: Array<{ name: string; originalIndex: number; originalData?: any }>;
   results: PayeeClassification[];
@@ -44,7 +45,11 @@ export function processPayeeDeduplication(
     let foundFuzzyMatch = false;
     if (useFuzzyMatching) {
       for (const [processedName, cachedResult] of duplicateCache.entries()) {
-        const similarity = calculateCombinedSimilarity(normalizedName, processedName);
+        const similarity = calculateCombinedSimilarity(
+          normalizedName,
+          processedName,
+          similarityWeights
+        );
         if (similarity.combined >= similarityThreshold) {
           console.log(`[V3 Batch] Fuzzy duplicate found: "${name}" matches "${cachedResult.payeeName}" (${similarity.combined.toFixed(1)}%)`);
           results.push({

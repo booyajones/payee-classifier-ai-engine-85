@@ -43,5 +43,6 @@ export {
   diceCoefficient,
   tokenSortRatio,
   calculateCombinedSimilarity,
-  advancedNormalization
+  advancedNormalization,
+  DEFAULT_SIMILARITY_WEIGHTS
 } from './classification/stringMatching';

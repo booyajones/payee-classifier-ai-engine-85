@@ -1,4 +1,6 @@
 
+import { SimilarityScores, SimilarityWeights } from '../types';
+
 /**
  * Advanced string matching library for payee name classification
  * Implements Levenshtein distance, Jaro-Winkler, Dice coefficient, and token-sort ratio
@@ -203,28 +205,40 @@ export function advancedNormalization(name: string): {
 /**
  * Combined similarity score using multiple algorithms
  */
-export interface SimilarityScores {
-  levenshtein: number;
-  jaroWinkler: number;
-  dice: number;
-  tokenSort: number;
-  combined: number;
-}
+export const DEFAULT_SIMILARITY_WEIGHTS: SimilarityWeights = {
+  levenshtein: 0.25,
+  jaroWinkler: 0.35,
+  dice: 0.25,
+  tokenSort: 0.15
+};
 
-export function calculateCombinedSimilarity(str1: string, str2: string): SimilarityScores {
+export function calculateCombinedSimilarity(
+  str1: string,
+  str2: string,
+  weights: SimilarityWeights = DEFAULT_SIMILARITY_WEIGHTS
+): SimilarityScores {
+  const finalWeights = { ...DEFAULT_SIMILARITY_WEIGHTS, ...weights };
+  const totalWeight =
+    finalWeights.levenshtein +
+    finalWeights.jaroWinkler +
+    finalWeights.dice +
+    finalWeights.tokenSort;
+
+  if (Math.abs(totalWeight - 1) > 0.0001) {
+    throw new Error('Similarity weight totals must equal 1');
+  }
+
   const levenshtein = levenshteinSimilarity(str1, str2);
   const jaroWinkler = jaroWinklerSimilarity(str1, str2);
   const dice = diceCoefficient(str1, str2);
   const tokenSort = tokenSortRatio(str1, str2);
-  
-  // Weighted average (adjust weights as needed)
-  const combined = (
-    levenshtein * 0.25 +
-    jaroWinkler * 0.35 +
-    dice * 0.25 +
-    tokenSort * 0.15
-  );
-  
+
+  const combined =
+    levenshtein * finalWeights.levenshtein +
+    jaroWinkler * finalWeights.jaroWinkler +
+    dice * finalWeights.dice +
+    tokenSort * finalWeights.tokenSort;
+
   return {
     levenshtein,
     jaroWinkler,
@@ -240,12 +254,15 @@ export function calculateCombinedSimilarity(str1: string, str2: string): Similar
 export function findBestMatches(
   target: string,
   candidates: string[],
-  threshold: number = 70
+  threshold: number = 70,
+  weights: SimilarityWeights = DEFAULT_SIMILARITY_WEIGHTS
 ): Array<{ candidate: string; scores: SimilarityScores }> {
-  const matches = candidates.map(candidate => ({
-    candidate,
-    scores: calculateCombinedSimilarity(target, candidate)
-  })).filter(match => match.scores.combined >= threshold);
-  
+  const matches = candidates
+    .map(candidate => ({
+      candidate,
+      scores: calculateCombinedSimilarity(target, candidate, weights)
+    }))
+    .filter(match => match.scores.combined >= threshold);
+
   return matches.sort((a, b) => b.scores.combined - a.scores.combined);
 }

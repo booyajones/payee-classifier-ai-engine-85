@@ -21,7 +21,8 @@ export {
   diceCoefficient,
   tokenSortRatio,
   calculateCombinedSimilarity,
-  advancedNormalization
+  advancedNormalization,
+  DEFAULT_SIMILARITY_WEIGHTS
 } from './stringMatching';
 
 // Export specific functions from enhancedClassification but exclude enhancedProcessBatch to avoid conflict

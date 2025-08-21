@@ -87,9 +87,12 @@ interface defined in `src/lib/types.ts`. Default values are provided in
 | `offlineMode` | Disable API calls and rely solely on local heuristics. |
 | `useFuzzyMatching` | Apply fuzzy name matching when deduplicating batch input. |
 | `useCacheForDuplicates` | Cache results for repeated names in a batch. |
-| `similarityThreshold` | Threshold used by fuzzy matching utilities. |
+| `similarityThreshold` | Combined similarity percentage required for fuzzy matches (default 90). |
+| `similarityWeights` | Weights for similarity algorithms. Must total 1. Recommended: `{ levenshtein: 0.25, jaroWinkler: 0.35, dice: 0.25, tokenSort: 0.15 }`. |
 | `retryFailedClassifications` | Attempt retries for failed AI calls. |
 | `maxRetries` | Maximum number of retry attempts. |
+
+The `similarityWeights` object allows fine‑tuning of the combined similarity score. All weight values must add up to **1**; otherwise an error is thrown.
 
 Additional constants in `config.ts` include `MAX_CONCURRENCY` for controlling
 the number of concurrent classification requests and `MAX_BATCH_SIZE` for

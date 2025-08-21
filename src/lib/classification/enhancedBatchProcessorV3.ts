@@ -23,7 +23,8 @@ export async function enhancedProcessBatchV3(
     payeeNames,
     originalFileData,
     config.useFuzzyMatching,
-    config.similarityThreshold
+    config.similarityThreshold,
+    config.similarityWeights
   );
   
   // Process in controlled batches with intelligent retry

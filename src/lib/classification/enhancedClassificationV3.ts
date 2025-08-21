@@ -1,5 +1,5 @@
 
-import { ClassificationResult, ClassificationConfig, SimilarityScores } from '../types';
+import { ClassificationResult, ClassificationConfig, SimilarityScores, SimilarityWeights } from '../types';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
 import { checkKeywordExclusion } from './enhancedKeywordExclusion';
 import { calculateCombinedSimilarity, advancedNormalization, levenshteinSimilarity } from './stringMatching';
@@ -143,7 +143,11 @@ function extractEntityFeatures(payeeName: string): {
 /**
  * Advanced fuzzy matching against cached results
  */
-async function performAdvancedFuzzyMatching(payeeName: string): Promise<ClassificationResult | null> {
+async function performAdvancedFuzzyMatching(
+  payeeName: string,
+  similarityThreshold = CONFIDENCE_THRESHOLDS.REVIEW_REQUIRED,
+  weights?: SimilarityWeights
+): Promise<ClassificationResult | null> {
   try {
     const cachedClassifications = JSON.parse(localStorage.getItem('payeeClassifications') || '{}');
     const cachedNames = Object.keys(cachedClassifications);
@@ -152,13 +156,13 @@ async function performAdvancedFuzzyMatching(payeeName: string): Promise<Classifi
     
     // Calculate similarities using multiple algorithms
     const similarities = cachedNames.map(cachedName => {
-      const scores = calculateCombinedSimilarity(payeeName, cachedName);
+      const scores = calculateCombinedSimilarity(payeeName, cachedName, weights);
       return {
         name: cachedName,
         scores,
         result: cachedClassifications[cachedName]
       };
-    }).filter(match => match.scores.combined >= CONFIDENCE_THRESHOLDS.REVIEW_REQUIRED);
+    }).filter(match => match.scores.combined >= similarityThreshold);
     
     if (similarities.length === 0) return null;
     
@@ -314,7 +318,11 @@ export async function enhancedClassifyPayeeV3(
     }
 
     // Stage 3: Advanced fuzzy matching
-    const fuzzyResult = await performAdvancedFuzzyMatching(payeeName);
+    const fuzzyResult = await performAdvancedFuzzyMatching(
+      payeeName,
+      config.similarityThreshold ?? CONFIDENCE_THRESHOLDS.REVIEW_REQUIRED,
+      config.similarityWeights
+    );
     if (fuzzyResult && fuzzyResult.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM_CONFIDENCE) {
       return fuzzyResult;
     }

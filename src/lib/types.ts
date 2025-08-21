@@ -18,6 +18,13 @@ export interface SimilarityScores {
   combined: number;
 }
 
+export interface SimilarityWeights {
+  levenshtein: number;
+  jaroWinkler: number;
+  dice: number;
+  tokenSort: number;
+}
+
 export interface KeywordExclusionResult {
   isExcluded: boolean;
   matchedKeywords: string[];
@@ -72,6 +79,7 @@ export interface ClassificationConfig {
   useFuzzyMatching?: boolean;
   useCacheForDuplicates?: boolean;
   similarityThreshold?: number; // For fuzzy matching
+  similarityWeights?: SimilarityWeights; // Weights for similarity algorithms
   retryFailedClassifications?: boolean;
   maxRetries?: number;
 }

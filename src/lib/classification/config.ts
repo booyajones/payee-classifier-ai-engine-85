@@ -1,5 +1,6 @@
 
 import { ClassificationConfig } from '../types';
+import { DEFAULT_SIMILARITY_WEIGHTS } from './stringMatching';
 
 // Helper function to safely get environment variables
 const getEnvVar = (key: string, defaultValue: string): string => {
@@ -16,6 +17,8 @@ export const DEFAULT_CLASSIFICATION_CONFIG: ClassificationConfig = {
   useEnhanced: false, // Default to NOT using enhanced classification
   offlineMode: false, // Default to online mode
   useFuzzyMatching: true, // Use fuzzy matching for better results
+  similarityThreshold: 90, // Threshold for fuzzy matching
+  similarityWeights: DEFAULT_SIMILARITY_WEIGHTS, // Recommended weighting
   useCacheForDuplicates: true // Deduplicate similar names
 };
 

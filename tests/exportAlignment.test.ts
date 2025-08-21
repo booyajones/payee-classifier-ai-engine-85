@@ -12,15 +12,15 @@ const createResult = (payeeName: string, classification: 'Business' | 'Individua
     processingTier: 'AI-Powered'
   },
   timestamp: new Date('2024-01-01T00:00:00Z'),
-  rowIndex: -1 // force name based matching
+  rowIndex: -1 // original index (overridden in tests)
 });
 
 describe('exportResultsWithOriginalDataV3 payee column matching', () => {
   it('uses the specified payee column when matching results', () => {
     const batch: BatchProcessingResult = {
       results: [
-        createResult('Acme LLC', 'Business'),
-        createResult('John Doe', 'Individual')
+        { ...createResult('Acme LLC', 'Business'), rowIndex: 0 },
+        { ...createResult('John Doe', 'Individual'), rowIndex: 1 }
       ],
       successCount: 2,
       failureCount: 0,
