@@ -1,5 +1,5 @@
 
-import { ClassificationResult, ClassificationConfig } from '../types';
+import { ClassificationResult } from '../types';
 import { classifyPayeeWithAI } from '../openai/singleClassification';
 import { enhancedClassifyPayeeWithAI } from '../openai/enhancedClassification';
 
@@ -8,7 +8,6 @@ import { enhancedClassifyPayeeWithAI } from '../openai/enhancedClassification';
  */
 export async function classifyPayee(
   payeeName: string,
-  config: ClassificationConfig,
   useEnhanced: boolean = false
 ): Promise<ClassificationResult> {
   console.log(`Classifying "${payeeName}" with real OpenAI API (enhanced: ${useEnhanced})`);
