@@ -3,6 +3,7 @@ import { BatchProcessingResult } from '../../types';
 
 export interface ExportRow {
   [key: string]: any;
+  'Payee_Name'?: string;
   'AI_Classification'?: string;
   'AI_Confidence_%'?: number;
   'AI_Processing_Tier'?: string;

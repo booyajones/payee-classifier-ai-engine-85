@@ -6,20 +6,20 @@ import { ExportRow } from './types';
  */
 export function createFallbackExportData(results: any[]): ExportRow[] {
   console.log('[FALLBACK EXPORTER] No original file data, creating export from results only');
-  
+
   return results.map(result => ({
     'Payee_Name': result.payeeName,
-    'Classification': result.result.classification,
-    'Confidence_%': result.result.confidence,
-    'Processing_Tier': result.result.processingTier,
-    'Reasoning': result.result.reasoning,
-    'Processing_Method': result.result.processingMethod || 'Unknown',
+    'AI_Classification': result.result.classification,
+    'AI_Confidence_%': result.result.confidence,
+    'AI_Processing_Tier': result.result.processingTier,
+    'AI_Reasoning': result.result.reasoning,
+    'AI_Processing_Method': result.result.processingMethod || 'Unknown',
     'Keyword_Exclusion': result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No',
     'Matched_Keywords': result.result.keywordExclusion?.matchedKeywords?.join('; ') || '',
     'Keyword_Confidence_%': result.result.keywordExclusion?.confidence || 0,
     'Keyword_Reasoning': result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied',
     'Matching_Rules': result.result.matchingRules?.join('; ') || '',
     'Classification_Timestamp': result.timestamp.toISOString(),
-    'Row_Index': result.rowIndex || 0
+    'Processing_Row_Index': result.rowIndex || 0
   }));
 }
