@@ -1,6 +1,7 @@
 
 import { BatchProcessingResult } from '../types';
 import { normalizePayeeName } from './nameProcessing';
+import { calculateCombinedSimilarity } from './stringMatching';
 
 /**
  * Validate that payee names match between results and original data
@@ -51,7 +52,12 @@ function validateDataAlignment(
 /**
  * Find matching result by payee name (fallback when index matching fails)
  */
-export function findResultByName(payeeName: string, results: any[], preferredIndex?: number): any | null {
+export function findResultByName(
+  payeeName: string,
+  results: any[],
+  preferredIndex?: number,
+  similarityThreshold: number = 80
+): any | null {
   const normalizedTargetName = normalizePayeeName(payeeName);
 
   // Gather all exact matches
@@ -69,19 +75,23 @@ export function findResultByName(payeeName: string, results: any[], preferredInd
     return exactMatches[0];
   }
 
-  // Gather fuzzy matches (contains)
-  const fuzzyMatches = results.filter(result => {
-    if (!result.payeeName) return false;
-    const resultNorm = normalizePayeeName(result.payeeName);
-    return resultNorm.includes(normalizedTargetName) || normalizedTargetName.includes(resultNorm);
-  });
+  // Gather fuzzy matches using combined similarity
+  const fuzzyCandidates = results
+    .map(result => {
+      if (!result.payeeName) return null;
+      const resultNorm = normalizePayeeName(result.payeeName);
+      const similarity = calculateCombinedSimilarity(resultNorm, normalizedTargetName).combined;
+      return { result, similarity };
+    })
+    .filter((item): item is { result: any; similarity: number } => !!item && item.similarity >= similarityThreshold)
+    .sort((a, b) => b.similarity - a.similarity);
 
-  if (fuzzyMatches.length > 0) {
+  if (fuzzyCandidates.length > 0) {
     if (preferredIndex !== undefined) {
-      const preferred = fuzzyMatches.find(r => r.rowIndex === preferredIndex);
-      if (preferred) return preferred;
+      const preferred = fuzzyCandidates.find(c => c.result.rowIndex === preferredIndex);
+      if (preferred) return preferred.result;
     }
-    return fuzzyMatches[0];
+    return fuzzyCandidates[0].result;
   }
 
   return null;

@@ -24,4 +24,20 @@ describe('findResultByName', () => {
     const match = findResultByName('Pepsi. Cola', punctuationResults);
     expect(match?.rowIndex).toBe(0);
   });
+
+  it('finds near matches using similarity threshold', () => {
+    const fuzzyResults = [
+      { payeeName: 'Starbucks Coffee', rowIndex: 0 }
+    ];
+    const match = findResultByName('Starbucks Cofee', fuzzyResults);
+    expect(match?.rowIndex).toBe(0);
+  });
+
+  it('respects the similarity threshold when no close match exists', () => {
+    const fuzzyResults = [
+      { payeeName: 'Starbucks Coffee', rowIndex: 0 }
+    ];
+    const match = findResultByName('Starbucks Cofee', fuzzyResults, undefined, 99);
+    expect(match).toBeNull();
+  });
 });
