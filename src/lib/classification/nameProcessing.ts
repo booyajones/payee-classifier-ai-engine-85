@@ -1,6 +1,7 @@
 import { jaroWinklerSimilarity } from './stringMatching';
 import { NAME_SIMILARITY_THRESHOLD } from './config';
 import { fetchDedupeMap, upsertDedupeLinks } from '@/lib/backend';
+import { createHash } from 'crypto';
 
 // Keep track of similar names for faster lookups
 const similarNameCache = new Map<string, string>();
@@ -33,6 +34,15 @@ export function normalizePayeeName(name: string): string {
     .trim();
     
   return normalized;
+}
+
+/**
+ * Normalize a name and return both the normalized text and a stable hash.
+ */
+export function normalizeName(name: string): { normalized: string; hash: string } {
+  const normalized = normalizePayeeName(name);
+  const hash = createHash('sha256').update(normalized).digest('hex');
+  return { normalized, hash };
 }
 
 /**

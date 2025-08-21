@@ -28,12 +28,15 @@ export interface UploadRowRecord {
   row_index: number;
   payee_name: string;
   normalized_name: string;
+  source_hash: string;
+  prompt_version: string;
   original_data?: any;
 }
 
 export interface ClassificationRecord {
   row_id: number;
   classification: PayeeClassification['result'];
+  prompt_version: string;
 }
 
 export interface DedupeLinkRecord {

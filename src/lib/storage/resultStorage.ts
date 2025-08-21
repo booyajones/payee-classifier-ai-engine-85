@@ -1,5 +1,6 @@
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { normalizePayeeName } from '@/lib/classification/nameProcessing';
+import { normalizeName } from '@/lib/classification/nameProcessing';
+import { promptVersion } from '@/lib/classification/config';
 import {
   isSupabaseConfigured,
   upsertUploadBatch,
@@ -57,19 +58,25 @@ export const saveProcessingResults = async (
     processing_time_ms: summary.processingTime,
   });
 
-  const rows = results.map((r, idx) => ({
-    batch_id: batchId,
-    row_index: idx,
-    payee_name: r.payeeName,
-    normalized_name: normalizePayeeName(r.payeeName),
-    original_data: r.originalData || null,
-  }));
+  const rows = results.map((r, idx) => {
+    const { normalized, hash } = normalizeName(r.payeeName);
+    return {
+      batch_id: batchId,
+      row_index: idx,
+      payee_name: r.payeeName,
+      normalized_name: normalized,
+      source_hash: hash,
+      prompt_version: promptVersion,
+      original_data: r.originalData || null,
+    };
+  });
 
   const insertedRows = await upsertUploadRows(rows);
 
   const classificationRecords = insertedRows.map((row, idx) => ({
     row_id: row.id as number,
     classification: results[idx].result,
+    prompt_version: promptVersion,
   }));
   await upsertClassifications(classificationRecords);
 
