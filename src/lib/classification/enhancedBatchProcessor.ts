@@ -3,6 +3,7 @@ import { ClassificationResult, ClassificationConfig } from '../types';
 import { processBatchClassification } from '../openai/batchAPI';
 import { filterPayeeNames, ExclusionResult } from './keywordExclusion';
 import { DEFAULT_CLASSIFICATION_CONFIG } from './config';
+import { logger } from '../logger';
 
 interface ProcessingStats {
   totalNames: number;
@@ -21,7 +22,7 @@ export async function enhancedProcessBatch(
   onProgress?: (current: number, total: number, percentage: number, stats?: any) => void,
   config: ClassificationConfig = DEFAULT_CLASSIFICATION_CONFIG
 ): Promise<ClassificationResult[]> {
-  console.log(`[ENHANCED] Starting enhanced batch processing of ${payeeNames.length} payees`);
+  logger.info(`[ENHANCED] Starting enhanced batch processing of ${payeeNames.length} payees`);
 
   const stats: ProcessingStats = {
     totalNames: payeeNames.length,
@@ -34,7 +35,7 @@ export async function enhancedProcessBatch(
 
   // Input validation
   if (!Array.isArray(payeeNames)) {
-    console.error('[ENHANCED] Invalid input: payeeNames is not an array');
+    logger.error('[ENHANCED] Invalid input: payeeNames is not an array');
     return [];
   }
 
@@ -43,7 +44,7 @@ export async function enhancedProcessBatch(
   const total = validPayeeNames.length;
   
   if (total === 0) {
-    console.log('[ENHANCED] No valid names to process');
+    logger.info('[ENHANCED] No valid names to process');
     return [];
   }
 
@@ -60,7 +61,7 @@ export async function enhancedProcessBatch(
 
   try {
     // Phase 1: Apply keyword exclusion filtering
-    console.log(`[ENHANCED] Phase 1: Keyword exclusion filtering`);
+    logger.info(`[ENHANCED] Phase 1: Keyword exclusion filtering`);
     if (onProgress) {
       onProgress(0, total, 5, { phase: 'Filtering excluded keywords...' });
     }
@@ -68,7 +69,7 @@ export async function enhancedProcessBatch(
     const { validNames, excludedNames } = filterPayeeNames(validPayeeNames);
     stats.excludedCount = excludedNames.length;
     
-    console.log(`[ENHANCED] Excluded ${excludedNames.length} names, processing ${validNames.length}`);
+    logger.info(`[ENHANCED] Excluded ${excludedNames.length} names, processing ${validNames.length}`);
 
     // Create exclusion results
     excludedNames.forEach(({ name, reason }) => {
@@ -96,7 +97,7 @@ export async function enhancedProcessBatch(
 
     // Phase 2: Process remaining names with OpenAI Batch API
     if (validNames.length > 0) {
-      console.log(`[ENHANCED] Phase 2: Processing ${validNames.length} names with OpenAI Batch API`);
+      logger.info(`[ENHANCED] Phase 2: Processing ${validNames.length} names with OpenAI Batch API`);
       
       try {
         const batchResults = await processBatchClassification({
@@ -141,7 +142,7 @@ export async function enhancedProcessBatch(
         });
 
       } catch (error) {
-        console.error(`[ENHANCED] Batch API processing failed:`, error);
+        logger.error(`[ENHANCED] Batch API processing failed:`, error);
         
         // Create fallback results for batch API failures
         validNames.forEach(name => {
@@ -161,7 +162,7 @@ export async function enhancedProcessBatch(
     }
 
     // Phase 3: Fill in any missing results
-    console.log(`[ENHANCED] Phase 3: Filling in missing results`);
+    logger.info(`[ENHANCED] Phase 3: Filling in missing results`);
     validPayeeNames.forEach((name, index) => {
       if (!results[index]) {
         results[index] = {
@@ -189,15 +190,15 @@ export async function enhancedProcessBatch(
     }
 
     const totalTime = (Date.now() - stats.startTime) / 1000;
-    console.log(`[ENHANCED] Batch processing complete in ${totalTime.toFixed(2)}s:`);
-    console.log(`[ENHANCED] - Excluded: ${stats.excludedCount}`);
-    console.log(`[ENHANCED] - Successful: ${stats.successCount}`);
-    console.log(`[ENHANCED] - Failed: ${stats.failureCount}`);
+    logger.info(`[ENHANCED] Batch processing complete in ${totalTime.toFixed(2)}s:`);
+    logger.info(`[ENHANCED] - Excluded: ${stats.excludedCount}`);
+    logger.info(`[ENHANCED] - Successful: ${stats.successCount}`);
+    logger.info(`[ENHANCED] - Failed: ${stats.failureCount}`);
 
     return results;
 
   } catch (error) {
-    console.error(`[ENHANCED] Error in enhanced batch processing:`, error);
+    logger.error(`[ENHANCED] Error in enhanced batch processing:`, error);
     
     // Create fallback results for all names
     const fallbackResults = validPayeeNames.map(() => ({

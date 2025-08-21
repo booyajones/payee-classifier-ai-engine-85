@@ -16,7 +16,7 @@ function getEnvVar(key: string, defaultValue: string): string {
   return defaultValue;
 }
 
-const currentLevel: LogLevel = (getEnvVar('LOG_LEVEL', 'info') as LogLevel);
+let currentLevel: LogLevel = (getEnvVar('LOG_LEVEL', 'info') as LogLevel);
 
 function shouldLog(level: LogLevel): boolean {
   return levelOrder[level] >= levelOrder[currentLevel];
@@ -35,3 +35,7 @@ export const logger = {
   warn: (...args: unknown[]) => log('warn', ...args),
   error: (...args: unknown[]) => log('error', ...args)
 };
+
+export function setLogLevel(level: LogLevel): void {
+  currentLevel = level;
+}
