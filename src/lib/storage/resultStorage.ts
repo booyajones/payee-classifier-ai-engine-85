@@ -9,9 +9,6 @@ import {
   supabase,
 } from '@/lib/backend';
 
-// Version of the classification prompt used when storing results
-const PROMPT_VERSION = 1;
-
 export { isSupabaseConfigured } from '@/lib/backend';
 
 export interface StoredBatchResult {
@@ -28,6 +25,14 @@ export interface StoredBatchResult {
   created_at: string;
   summary: BatchProcessingResult;
   classifications: PayeeClassification[];
+}
+
+interface UploadRow {
+  id: number;
+  row_index: number;
+  payee_name: string;
+  original_data: unknown;
+  classifications: { classification: PayeeClassification['result']; prompt_version: string }[];
 }
 
 export const saveProcessingResults = async (
@@ -79,7 +84,6 @@ export const saveProcessingResults = async (
   // Buffer classifications in memory and persist in a single batch
   const classificationBuffer = insertedRows.map((row, idx) => ({
     row_id: row.id as number,
-    prompt_version: PROMPT_VERSION,
     classification: results[idx].result,
     prompt_version: promptVersion,
   }));
@@ -115,7 +119,7 @@ export const getResultById = async (id: string): Promise<StoredBatchResult | nul
     return null;
   }
 
-  const classifications: PayeeClassification[] = (rows || []).map((row: any) => ({
+  const classifications: PayeeClassification[] = (rows || []).map((row: UploadRow) => ({
     id: String(row.id),
     payeeName: row.payee_name,
     result: row.classifications?.[0]?.classification,
@@ -142,7 +146,7 @@ export const getResultById = async (id: string): Promise<StoredBatchResult | nul
       successCount: batch.total_payees - batch.error_count,
       failureCount: batch.error_count,
       processingTime: batch.processing_time_ms,
-      originalFileData: (rows || []).map((r: any) => r.original_data),
+      originalFileData: (rows || []).map((r: UploadRow) => r.original_data),
       enhancedStats: undefined,
     }
   };
