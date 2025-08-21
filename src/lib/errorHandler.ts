@@ -38,7 +38,12 @@ export class FileValidationError extends Error implements AppError {
 export const ERROR_CODES = {
   BATCH_CREATION_FAILED: 'BATCH_CREATION_FAILED',
   API_QUOTA_EXCEEDED: 'API_QUOTA_EXCEEDED',
+  RATE_LIMIT: 'RATE_LIMIT',
   NETWORK_ERROR: 'NETWORK_ERROR',
+  INVALID_JSON: 'INVALID_JSON',
+  UPSTREAM_5XX: 'UPSTREAM_5XX',
+  TIMEOUT: 'TIMEOUT',
+  BATCH_ABORTED: 'BATCH_ABORTED',
   FILE_TOO_LARGE: 'FILE_TOO_LARGE',
   INVALID_FILE_FORMAT: 'INVALID_FILE_FORMAT',
   EMPTY_FILE: 'EMPTY_FILE',
@@ -47,6 +52,17 @@ export const ERROR_CODES = {
   JOB_EXPIRED: 'JOB_EXPIRED',
   PARSING_ERROR: 'PARSING_ERROR'
 } as const;
+
+export const RETRY_INSTRUCTIONS: Record<string, string> = {
+  [ERROR_CODES.RATE_LIMIT]: 'Please wait before retrying.',
+  [ERROR_CODES.API_QUOTA_EXCEEDED]: 'Please check your plan and billing details.',
+  [ERROR_CODES.NETWORK_ERROR]: 'Check your connection and try again.',
+  [ERROR_CODES.INVALID_JSON]: 'The response was malformed. Please retry.',
+  [ERROR_CODES.UPSTREAM_5XX]: 'Upstream service error. Try again shortly.',
+  [ERROR_CODES.TIMEOUT]: 'The request timed out. Please retry.',
+  [ERROR_CODES.BATCH_ABORTED]: 'The batch was aborted. Please resubmit.',
+  [ERROR_CODES.STORAGE_QUOTA_EXCEEDED]: 'Local storage is full. Please clear some data and try again.',
+};
 
 export const handleError = (error: unknown, context?: string): AppError => {
   console.error(`[ERROR HANDLER] ${context || 'Unknown context'}:`, error);
@@ -57,28 +73,75 @@ export const handleError = (error: unknown, context?: string): AppError => {
 
   if (error instanceof Error) {
     // Handle specific error patterns
-    if (error.message.includes('quota') || error.message.includes('rate limit')) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes('rate limit') || message.includes('too many requests')) {
+      return new BatchProcessingError(
+        ERROR_CODES.RATE_LIMIT,
+        'Rate limit exceeded.',
+        error.message,
+        true
+      );
+    }
+
+    if (message.includes('quota')) {
       return new BatchProcessingError(
         ERROR_CODES.API_QUOTA_EXCEEDED,
-        'API quota exceeded. Please try again later.',
+        'API quota exceeded.',
         error.message,
         true
       );
     }
 
-    if (error.message.includes('network') || error.message.includes('fetch')) {
+    if (message.includes('invalid json') || message.includes('unexpected token') || message.includes('json parse')) {
+      return new BatchProcessingError(
+        ERROR_CODES.INVALID_JSON,
+        'Invalid JSON response received.',
+        error.message,
+        true
+      );
+    }
+
+    if (/(5\d{2}|internal server error|bad gateway|service unavailable)/.test(message)) {
+      return new BatchProcessingError(
+        ERROR_CODES.UPSTREAM_5XX,
+        'Upstream service returned an error.',
+        error.message,
+        true
+      );
+    }
+
+    if (message.includes('timeout') || message.includes('timed out') || message.includes('aborterror') || message.includes('etimedout')) {
+      return new BatchProcessingError(
+        ERROR_CODES.TIMEOUT,
+        'Request timed out.',
+        error.message,
+        true
+      );
+    }
+
+    if (message.includes('batch aborted') || message.includes('batch was aborted') || message.includes('batch cancelled')) {
+      return new BatchProcessingError(
+        ERROR_CODES.BATCH_ABORTED,
+        'Batch processing was aborted.',
+        error.message,
+        false
+      );
+    }
+
+    if (message.includes('network') || message.includes('fetch')) {
       return new BatchProcessingError(
         ERROR_CODES.NETWORK_ERROR,
-        'Network error occurred. Please check your connection and try again.',
+        'Network error occurred.',
         error.message,
         true
       );
     }
 
-    if (error.message.includes('QuotaExceededError') || error.message.includes('storage quota')) {
+    if (message.includes('quotaexceedederror') || message.includes('storage quota')) {
       return new BatchProcessingError(
         ERROR_CODES.STORAGE_QUOTA_EXCEEDED,
-        'Local storage is full. Please clear some data and try again.',
+        'Local storage is full.',
         error.message,
         false
       );
@@ -104,10 +167,12 @@ export const handleError = (error: unknown, context?: string): AppError => {
 
 export const showErrorToast = (error: AppError, context?: string) => {
   const title = context ? `${context} Error` : 'Error';
-  
+
+  const instruction = RETRY_INSTRUCTIONS[error.code];
+
   toast({
     title,
-    description: error.message,
+    description: `${error.message}${instruction ? ` ${instruction}` : ''} (Code: ${error.code})`,
     variant: "destructive",
   });
 
@@ -116,14 +181,16 @@ export const showErrorToast = (error: AppError, context?: string) => {
 };
 
 export const showRetryableErrorToast = (
-  error: AppError, 
-  onRetry: () => void, 
+  error: AppError,
+  onRetry: () => void,
   context?: string
 ) => {
   if (error.retryable) {
+    const instruction = RETRY_INSTRUCTIONS[error.code];
+
     toast({
       title: `${context || 'Operation'} Failed`,
-      description: `${error.message} Click retry to try again.`,
+      description: `${error.message}${instruction ? ` ${instruction}` : ''} (Code: ${error.code})`,
       variant: "destructive",
     });
 
