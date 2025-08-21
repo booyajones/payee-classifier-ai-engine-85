@@ -39,28 +39,54 @@ export function exportResultsFixed(
     // Create export row with original data first
     const exportRow: any = includeAllColumns ? { ...originalRow } : {};
     
-    // Add classification results
+    // Add classification results (matching resultsMerger.ts column names)
     exportRow['AI_Classification'] = result.result.classification;
-    exportRow['AI_Confidence'] = `${result.result.confidence}%`;
+    exportRow['AI_Confidence_%'] = result.result.confidence;
+    exportRow['AI_Processing_Tier'] = result.result.processingTier;
     exportRow['AI_Reasoning'] = result.result.reasoning;
-    exportRow['Processing_Method'] = result.result.processingMethod;
-    exportRow['Processing_Tier'] = result.result.processingTier;
-    exportRow['Payee_Name_Used'] = result.payeeName;
-    
-    // Add keyword exclusion details if it was excluded
-    if (result.result.processingTier === 'Excluded') {
-      exportRow['Keyword_Excluded'] = 'YES';
-      exportRow['Exclusion_Reason'] = result.result.reasoning;
-      exportRow['Matched_Keywords'] = result.result.keywordExclusion?.matchedKeywords?.join('; ') || '';
-    } else {
-      exportRow['Keyword_Excluded'] = 'NO';
-      exportRow['Exclusion_Reason'] = 'Not excluded by keywords';
-      exportRow['Matched_Keywords'] = '';
+    exportRow['AI_Processing_Method'] = result.result.processingMethod;
+
+    // Keyword exclusion details
+    exportRow['Keyword_Exclusion'] = result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No';
+    exportRow['Matched_Keywords'] = result.result.keywordExclusion?.matchedKeywords?.join('; ') || '';
+    exportRow['Keyword_Confidence_%'] = result.result.keywordExclusion?.confidence || 0;
+    exportRow['Keyword_Reasoning'] =
+      result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied';
+
+    // Enhanced classification details
+    exportRow['Matching_Rules'] = result.result.matchingRules?.join('; ') || '';
+
+    // Similarity scores
+    const similarityDetails: string[] = [];
+    if (result.result.similarityScores?.levenshtein) {
+      similarityDetails.push(
+        `Levenshtein: ${result.result.similarityScores.levenshtein}`
+      );
     }
-    
-    // Add processing timestamp
-    exportRow['Processed_At'] = result.timestamp.toISOString();
-    exportRow['Data_Source'] = 'Full File Processing (original structure preserved)';
+    if (result.result.similarityScores?.jaroWinkler) {
+      similarityDetails.push(
+        `Jaro-Winkler: ${result.result.similarityScores.jaroWinkler}`
+      );
+    }
+    if (result.result.similarityScores?.dice) {
+      similarityDetails.push(`Dice: ${result.result.similarityScores.dice}`);
+    }
+    if (result.result.similarityScores?.tokenSort) {
+      similarityDetails.push(
+        `Token Sort: ${result.result.similarityScores.tokenSort}`
+      );
+    }
+    if (result.result.similarityScores?.combined) {
+      similarityDetails.push(
+        `Combined: ${result.result.similarityScores.combined}`
+      );
+    }
+    exportRow['Similarity_Scores'] = similarityDetails.join(' | ') || '';
+
+    // Timestamps and metadata
+    exportRow['Classification_Timestamp'] = result.timestamp.toISOString();
+    exportRow['Processing_Row_Index'] = result.rowIndex ?? i;
+    exportRow['Data_Alignment_Status'] = 'Perfect 1:1 Match';
     
     exportData.push(exportRow);
   }
@@ -91,31 +117,60 @@ export function exportResultsFromClassifications(
     if (result.originalData && Object.keys(result.originalData).length > 0) {
       Object.assign(exportRow, result.originalData);
     } else {
-      exportRow['Row_Number'] = index + 1;
+      exportRow['Processing_Row_Index'] = index;
       exportRow['Payee_Name'] = result.payeeName;
     }
     
     // Add classification results
     exportRow['AI_Classification'] = result.result.classification;
-    exportRow['AI_Confidence'] = `${result.result.confidence}%`;
+    exportRow['AI_Confidence_%'] = result.result.confidence;
+    exportRow['AI_Processing_Tier'] = result.result.processingTier;
     exportRow['AI_Reasoning'] = result.result.reasoning;
-    exportRow['Processing_Method'] = result.result.processingMethod || 'OpenAI Batch API';
-    exportRow['Processing_Tier'] = result.result.processingTier;
-    
-    // Add keyword exclusion details
-    if (result.result.processingTier === 'Excluded') {
-      exportRow['Keyword_Excluded'] = 'YES';
-      exportRow['Exclusion_Reason'] = result.result.reasoning;
-      exportRow['Matched_Keywords'] = result.result.keywordExclusion?.matchedKeywords?.join('; ') || '';
-    } else {
-      exportRow['Keyword_Excluded'] = 'NO';
-      exportRow['Exclusion_Reason'] = 'Not excluded by keywords';
-      exportRow['Matched_Keywords'] = '';
+    exportRow['AI_Processing_Method'] =
+      result.result.processingMethod || 'OpenAI Batch API';
+
+    // Keyword exclusion details
+    exportRow['Keyword_Exclusion'] = result.result.keywordExclusion?.isExcluded ? 'Yes' : 'No';
+    exportRow['Matched_Keywords'] = result.result.keywordExclusion?.matchedKeywords?.join('; ') || '';
+    exportRow['Keyword_Confidence_%'] = result.result.keywordExclusion?.confidence || 0;
+    exportRow['Keyword_Reasoning'] =
+      result.result.keywordExclusion?.reasoning || 'No keyword exclusion applied';
+
+    // Enhanced classification details
+    exportRow['Matching_Rules'] = result.result.matchingRules?.join('; ') || '';
+
+    // Similarity scores
+    const similarityDetails: string[] = [];
+    if (result.result.similarityScores?.levenshtein) {
+      similarityDetails.push(
+        `Levenshtein: ${result.result.similarityScores.levenshtein}`
+      );
     }
-    
-    // Add processing timestamp
-    exportRow['Processed_At'] = result.timestamp.toISOString();
-    exportRow['Data_Source'] = 'Fallback Export (original data not preserved - should not happen)';
+    if (result.result.similarityScores?.jaroWinkler) {
+      similarityDetails.push(
+        `Jaro-Winkler: ${result.result.similarityScores.jaroWinkler}`
+      );
+    }
+    if (result.result.similarityScores?.dice) {
+      similarityDetails.push(`Dice: ${result.result.similarityScores.dice}`);
+    }
+    if (result.result.similarityScores?.tokenSort) {
+      similarityDetails.push(
+        `Token Sort: ${result.result.similarityScores.tokenSort}`
+      );
+    }
+    if (result.result.similarityScores?.combined) {
+      similarityDetails.push(
+        `Combined: ${result.result.similarityScores.combined}`
+      );
+    }
+    exportRow['Similarity_Scores'] = similarityDetails.join(' | ') || '';
+
+    // Timestamps and metadata
+    exportRow['Classification_Timestamp'] = result.timestamp.toISOString();
+    exportRow['Processing_Row_Index'] = result.rowIndex ?? index;
+    exportRow['Data_Alignment_Status'] =
+      'Fallback Export (original data not preserved - should not happen)';
     
     return exportRow;
   });

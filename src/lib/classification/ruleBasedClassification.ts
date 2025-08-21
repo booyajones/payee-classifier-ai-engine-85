@@ -1,4 +1,13 @@
 import { logger } from '../logger';
+import { ClassificationResult } from '../types';
+import {
+  LEGAL_SUFFIXES,
+  BUSINESS_KEYWORDS,
+  INDUSTRY_IDENTIFIERS,
+  GOVERNMENT_PATTERNS,
+  PROFESSIONAL_TITLES
+} from './config';
+import { probablepeople } from './probablepeople';
 
 /**
  * Rule-based classification using probablepeople library and custom rules
