@@ -33,6 +33,7 @@ export interface UploadRowRecord {
 
 export interface ClassificationRecord {
   row_id: number;
+  prompt_version: number;
   classification: PayeeClassification['result'];
 }
 
@@ -67,7 +68,7 @@ export async function upsertClassifications(records: ClassificationRecord[]): Pr
   if (!records.length) return;
   const { error } = await supabase
     .from('classifications')
-    .upsert(records, { onConflict: 'row_id' });
+    .upsert(records, { onConflict: 'row_id,prompt_version' });
   if (error) throw error;
 }
 

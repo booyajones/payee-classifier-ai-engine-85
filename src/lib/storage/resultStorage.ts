@@ -8,6 +8,9 @@ import {
   supabase,
 } from '@/lib/backend';
 
+// Version of the classification prompt used when storing results
+const PROMPT_VERSION = 1;
+
 export { isSupabaseConfigured } from '@/lib/backend';
 
 export interface StoredBatchResult {
@@ -67,11 +70,13 @@ export const saveProcessingResults = async (
 
   const insertedRows = await upsertUploadRows(rows);
 
-  const classificationRecords = insertedRows.map((row, idx) => ({
+  // Buffer classifications in memory and persist in a single batch
+  const classificationBuffer = insertedRows.map((row, idx) => ({
     row_id: row.id as number,
+    prompt_version: PROMPT_VERSION,
     classification: results[idx].result,
   }));
-  await upsertClassifications(classificationRecords);
+  await upsertClassifications(classificationBuffer);
 
   console.log(`[RESULT STORAGE] Successfully saved results with batch ID: ${batchId}`);
   return batchId;
@@ -95,7 +100,7 @@ export const getResultById = async (id: string): Promise<StoredBatchResult | nul
 
   const { data: rows, error: rowsError } = await supabase!
     .from('upload_rows')
-    .select('id, row_index, payee_name, original_data, classifications(classification)')
+    .select('id, row_index, payee_name, original_data, classifications(classification,prompt_version)')
     .eq('batch_id', id)
     .order('row_index', { ascending: true });
   if (rowsError) {

@@ -17,7 +17,7 @@ vi.mock('@/lib/backend', () => {
 
 import { saveProcessingResults } from '@/lib/storage/resultStorage';
 import type { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { upsertUploadRows } from '@/lib/backend';
+import { upsertUploadRows, upsertClassifications } from '@/lib/backend';
 
 describe('saveProcessingResults', () => {
   it('persists payee_name and normalized_name', async () => {
@@ -60,6 +60,7 @@ describe('saveProcessingResults', () => {
     const batchId = await saveProcessingResults(results, summary);
     expect(batchId).toBe('batch123');
 
+    // upload rows should be sent in a single batch
     expect(upsertUploadRows).toHaveBeenCalledTimes(1);
     const savedRows = (upsertUploadRows as any).mock.calls[0][0] as any[];
 
@@ -72,6 +73,12 @@ describe('saveProcessingResults', () => {
       normalized_name: 'ACME',
     });
     expect(savedRows[0].normalized_name).toBe(savedRows[1].normalized_name);
+
+    // classifications should also be buffered and saved once
+    expect(upsertClassifications).toHaveBeenCalledTimes(1);
+    const savedClassifications = (upsertClassifications as any).mock.calls[0][0] as any[];
+    expect(savedClassifications).toHaveLength(2);
+    expect(savedClassifications[0]).toMatchObject({ prompt_version: 1 });
   });
 });
 
