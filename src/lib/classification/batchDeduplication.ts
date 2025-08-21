@@ -2,6 +2,7 @@
 import { PayeeClassification } from '../types';
 import { calculateCombinedSimilarity } from './stringMatching';
 import { normalizePayeeName } from './nameProcessing';
+import { logger } from '../logger';
 
 /**
  * Process and deduplicate payee names with fuzzy matching
@@ -52,7 +53,7 @@ export function processPayeeDeduplication(
       for (const [processedName, cachedResult] of duplicateCache.entries()) {
         const similarity = calculateCombinedSimilarity(normalizedName, processedName);
         if (similarity.combined >= similarityThreshold) {
-          console.log(`[V3 Batch] Fuzzy duplicate found: "${name}" matches "${cachedResult.payeeName}" (${similarity.combined.toFixed(1)}%)`);
+          logger.debug(`[V3 Batch] Fuzzy duplicate found: "${name}" matches "${cachedResult.payeeName}" (${similarity.combined.toFixed(1)}%)`);
           results.push({
             ...cachedResult,
             id: `${cachedResult.id}-fuzzy-${i}`,
@@ -81,7 +82,7 @@ export function processPayeeDeduplication(
     }
   }
 
-  console.log(`[V3 Batch] After deduplication: ${processQueue.length} unique names to process (${payeeNames.length - processQueue.length} duplicates found)`);
+  logger.info(`[V3 Batch] After deduplication: ${processQueue.length} unique names to process (${payeeNames.length - processQueue.length} duplicates found)`);
 
   return { processQueue, results, duplicateCache };
 }

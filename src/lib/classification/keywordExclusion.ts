@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 // Updated comprehensive exclusion keywords based on your provided list
 const COMPREHENSIVE_EXCLUSION_KEYWORDS = [
@@ -607,14 +608,15 @@ export interface ExclusionResult {
  * Uses simple contains matching - if ANY keyword is found, exclude the payee
  * No duplicates - each payee gets ONE result regardless of multiple keyword matches
  */
+
 export function checkKeywordExclusion(
-  payeeName: string, 
+  payeeName: string,
   exclusionKeywords: string[] = COMPREHENSIVE_EXCLUSION_KEYWORDS
 ): ExclusionResult {
-  console.log(`[KEYWORD EXCLUSION] Testing "${payeeName}" against ${exclusionKeywords.length} keywords`);
+  logger.debug(`[KEYWORD EXCLUSION] Testing "${payeeName}" against ${exclusionKeywords.length} keywords`);
   
   if (!payeeName || typeof payeeName !== 'string') {
-    console.log(`[KEYWORD EXCLUSION] Invalid input: "${payeeName}"`);
+    logger.warn(`[KEYWORD EXCLUSION] Invalid input: "${payeeName}"`);
     return {
       isExcluded: true,
       matchedKeywords: ['invalid-input'],
@@ -623,7 +625,7 @@ export function checkKeywordExclusion(
   }
 
   const normalizedName = payeeName.toUpperCase().trim();
-  console.log(`[KEYWORD EXCLUSION] Normalized name: "${normalizedName}"`);
+  logger.debug(`[KEYWORD EXCLUSION] Normalized name: "${normalizedName}"`);
 
   // Check each exclusion keyword - stop at first match to avoid duplicates
   for (const keyword of exclusionKeywords) {
@@ -634,7 +636,7 @@ export function checkKeywordExclusion(
 
     // Simple contains matching
     if (normalizedName.includes(normalizedKeyword)) {
-      console.log(`[KEYWORD EXCLUSION] ✅ MATCH FOUND! "${payeeName}" contains keyword "${keyword}"`);
+      logger.info(`[KEYWORD EXCLUSION] ✅ MATCH FOUND! "${payeeName}" contains keyword "${keyword}"`);
       return {
         isExcluded: true,
         matchedKeywords: [keyword],
@@ -643,7 +645,7 @@ export function checkKeywordExclusion(
     }
   }
 
-  console.log(`[KEYWORD EXCLUSION] ❌ No match found for "${payeeName}"`);
+  logger.debug(`[KEYWORD EXCLUSION] ❌ No match found for "${payeeName}"`);
   return {
     isExcluded: false,
     matchedKeywords: [],
@@ -700,7 +702,7 @@ export function getComprehensiveExclusionKeywords(): string[] {
  */
 export function validateExclusionKeywords(keywords: string[]): string[] {
   if (!Array.isArray(keywords)) {
-    console.warn('[EXCLUSION] Invalid keywords array, using comprehensive list');
+    logger.warn('[EXCLUSION] Invalid keywords array, using comprehensive list');
     return COMPREHENSIVE_EXCLUSION_KEYWORDS;
   }
 
