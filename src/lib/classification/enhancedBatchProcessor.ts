@@ -76,8 +76,8 @@ export async function enhancedProcessBatch(
       const originalIndex = validPayeeNames.indexOf(name);
       if (originalIndex !== -1) {
         results[originalIndex] = {
-          classification: 'Individual', // Default for excluded
-          confidence: 0,
+          classification: 'Business',
+          confidence: 95,
           reasoning: `Excluded due to keywords: ${reason.join(', ')}`,
           processingTier: 'Excluded'
         };

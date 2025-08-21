@@ -26,7 +26,7 @@ export async function enhancedClassifyPayeeV2(
   const exclusionResult = checkKeywordExclusion(payeeName);
   if (exclusionResult.isExcluded) {
     return {
-      classification: 'Individual',
+      classification: 'Business',
       confidence: 95,
       reasoning: `Excluded by keyword filter: ${exclusionResult.matchedKeywords?.join(", ")}`,
       processingTier: 'Excluded',
