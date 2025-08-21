@@ -13,7 +13,7 @@ export async function enhancedProcessBatchV3(
   logger.info(`[V3 Batch] Starting batch processing of ${payeeNames.length} payees with intelligent escalation`);
   
   // Enhanced deduplication with fuzzy matching
-  const { processQueue, results, duplicateCache } = processPayeeDeduplication(
+  const { processQueue, results, duplicateCache } = await processPayeeDeduplication(
     payeeNames,
     originalFileData,
     config.useFuzzyMatching,

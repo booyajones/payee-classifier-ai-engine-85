@@ -6,11 +6,13 @@ vi.mock('@/lib/backend', () => {
     rows.map((r, idx) => ({ ...r, id: idx + 1 }))
   );
   const upsertClassifications = vi.fn().mockResolvedValue(undefined);
+  const upsertDedupeLinks = vi.fn().mockResolvedValue(undefined);
   return {
     isSupabaseConfigured: () => true,
     upsertUploadBatch,
     upsertUploadRows,
     upsertClassifications,
+    upsertDedupeLinks,
     supabase: {},
   };
 });
@@ -63,15 +65,11 @@ describe('saveProcessingResults', () => {
     expect(upsertUploadRows).toHaveBeenCalledTimes(1);
     const savedRows = (upsertUploadRows as any).mock.calls[0][0] as any[];
 
+    expect(savedRows).toHaveLength(1);
     expect(savedRows[0]).toMatchObject({
       payee_name: 'Acme LLC',
       normalized_name: 'ACME',
     });
-    expect(savedRows[1]).toMatchObject({
-      payee_name: 'Acme',
-      normalized_name: 'ACME',
-    });
-    expect(savedRows[0].normalized_name).toBe(savedRows[1].normalized_name);
   });
 });
 

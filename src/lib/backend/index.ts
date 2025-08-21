@@ -29,6 +29,7 @@ export interface UploadRowRecord {
   payee_name: string;
   normalized_name: string;
   original_data?: any;
+  source_hash: string;
 }
 
 export interface ClassificationRecord {

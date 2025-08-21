@@ -1,10 +1,12 @@
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
 import { normalizePayeeName } from '@/lib/classification/nameProcessing';
+import { createHash } from 'crypto';
 import {
   isSupabaseConfigured,
   upsertUploadBatch,
   upsertUploadRows,
   upsertClassifications,
+  upsertDedupeLinks,
   supabase,
 } from '@/lib/backend';
 
@@ -57,21 +59,44 @@ export const saveProcessingResults = async (
     processing_time_ms: summary.processingTime,
   });
 
-  const rows = results.map((r, idx) => ({
-    batch_id: batchId,
-    row_index: idx,
-    payee_name: r.payeeName,
-    normalized_name: normalizePayeeName(r.payeeName),
-    original_data: r.originalData || null,
-  }));
+  const rowMap = new Map<string, { row: any; classification: PayeeClassification }>();
+  const dedupeLinks: { canonical_normalized: string; duplicate_normalized: string }[] = [];
 
-  const insertedRows = await upsertUploadRows(rows);
+  results.forEach((r, idx) => {
+    const normalizedName = normalizePayeeName(r.payeeName);
+    const sourceHash = createHash('sha256').update(normalizedName).digest('hex');
 
-  const classificationRecords = insertedRows.map((row, idx) => ({
+    const row = {
+      batch_id: batchId,
+      row_index: idx,
+      payee_name: r.payeeName,
+      normalized_name: normalizedName,
+      original_data: r.originalData || null,
+      source_hash: sourceHash,
+    };
+
+    const existing = rowMap.get(sourceHash);
+    if (!existing) {
+      rowMap.set(sourceHash, { row, classification: r });
+    } else if (normalizedName !== existing.row.normalized_name) {
+      // Different normalized name indicates fuzzy duplicate
+      dedupeLinks.push({
+        canonical_normalized: existing.row.normalized_name,
+        duplicate_normalized: normalizedName,
+      });
+    }
+  });
+
+  const dedupedRows = Array.from(rowMap.values()).map(v => v.row);
+  const insertedRows = await upsertUploadRows(dedupedRows);
+
+  const classificationRecords = insertedRows.map(row => ({
     row_id: row.id as number,
-    classification: results[idx].result,
+    classification: rowMap.get(row.source_hash)!.classification.result,
   }));
   await upsertClassifications(classificationRecords);
+
+  await upsertDedupeLinks(dedupeLinks);
 
   console.log(`[RESULT STORAGE] Successfully saved results with batch ID: ${batchId}`);
   return batchId;
