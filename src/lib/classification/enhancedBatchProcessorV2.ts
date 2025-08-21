@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig, EnhancedBatchStatistics } from '../types';
 import { enhancedClassifyPayeeV2 } from './enhancedClassificationV2';
@@ -23,7 +24,7 @@ export async function enhancedProcessBatchV2(
   const results: PayeeClassification[] = [];
   const failedItems: { row: BatchRow; error: string; retryCount: number }[] = [];
   
-  console.log(`Starting enhanced batch processing of ${rows.length} items`);
+  logger.info(`Starting enhanced batch processing of ${rows.length} items`);
   
   // Step 1: Bulk keyword exclusion check
   const payeeNames = rows.map(row => row.payeeName);
@@ -47,7 +48,7 @@ export async function enhancedProcessBatchV2(
       }
     });
     
-    console.log(`Deduplication: ${rows.length} -> ${processedRows.length} unique names`);
+    logger.info(`Deduplication: ${rows.length} -> ${processedRows.length} unique names`);
   }
   
   // Step 3: Process each unique item
@@ -94,7 +95,7 @@ export async function enhancedProcessBatchV2(
       }
       
     } catch (error) {
-      console.error(`Failed to classify "${row.payeeName}":`, error);
+      logger.error(`Failed to classify "${row.payeeName}":`, error);
       
       failedItems.push({
         row,
@@ -107,7 +108,7 @@ export async function enhancedProcessBatchV2(
   // Step 4: Retry failed items
   const maxRetries = 2;
   for (let retry = 0; retry < maxRetries && failedItems.length > 0; retry++) {
-    console.log(`Retry attempt ${retry + 1} for ${failedItems.length} failed items`);
+    logger.info(`Retry attempt ${retry + 1} for ${failedItems.length} failed items`);
     
     const toRetry = [...failedItems];
     failedItems.length = 0;
@@ -147,7 +148,7 @@ export async function enhancedProcessBatchV2(
   
   // Step 5: Handle remaining failures with fallback classification
   for (const { row, error } of failedItems) {
-    console.warn(`Final fallback for failed item: ${row.payeeName}`);
+    logger.warn(`Final fallback for failed item: ${row.payeeName}`);
     
     const fallbackClassification: PayeeClassification = {
       id: `${Date.now()}-fallback-${row.rowIndex}`,
@@ -194,7 +195,7 @@ export async function enhancedProcessBatchV2(
     similarityStats: calculateSimilarityStats(results)
   };
   
-  console.log(`Batch processing completed: ${results.length} items in ${processingTime}ms`);
+  logger.info(`Batch processing completed: ${results.length} items in ${processingTime}ms`);
   
   return {
     results,

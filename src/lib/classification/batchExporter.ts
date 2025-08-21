@@ -1,7 +1,7 @@
-
 import { BatchProcessingResult } from '../types';
 import { normalizePayeeName } from './nameProcessing';
 import { calculateCombinedSimilarity } from './stringMatching';
+import { logger } from '../logger';
 
 /**
  * Validate that payee names match between results and original data
@@ -26,7 +26,7 @@ function validateDataAlignment(
   }
 
   if (!payeeColumnName) {
-    console.warn('[BATCH EXPORTER] Could not determine payee column name for validation');
+    logger.warn('[BATCH EXPORTER] Could not determine payee column name for validation');
     return { isValid: true, mismatches: [] }; // Skip validation if we can't find the column
   }
 

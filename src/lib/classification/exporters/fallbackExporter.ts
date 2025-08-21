@@ -1,3 +1,4 @@
+import { logger } from '../../logger';
 
 import { ExportRow } from './types';
 
@@ -5,7 +6,7 @@ import { ExportRow } from './types';
  * Creates export data from results only when no original file data is available
  */
 export function createFallbackExportData(results: any[]): ExportRow[] {
-  console.log('[FALLBACK EXPORTER] No original file data, creating export from results only');
+  logger.info('[FALLBACK EXPORTER] No original file data, creating export from results only');
   
   return results.map(result => ({
     'Payee_Name': result.payeeName,

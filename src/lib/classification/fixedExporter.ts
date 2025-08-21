@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { BatchProcessingResult, PayeeClassification } from '../types';
 
@@ -9,7 +10,7 @@ export function exportResultsFixed(
   batchResult: BatchProcessingResult,
   includeAllColumns: boolean = true
 ): any[] {
-  console.log('[FIXED EXPORTER] Starting export with perfect alignment strategy');
+  logger.info('[FIXED EXPORTER] Starting export with perfect alignment strategy');
   
   if (!batchResult.results) {
     throw new Error('Missing results data for export');
@@ -23,7 +24,7 @@ export function exportResultsFixed(
     throw new Error(`Data length mismatch: ${batchResult.originalFileData.length} original vs ${batchResult.results.length} results`);
   }
   
-  console.log(`[FIXED EXPORTER] Full data export with original file structure for ${batchResult.results.length} rows`);
+  logger.info(`[FIXED EXPORTER] Full data export with original file structure for ${batchResult.results.length} rows`);
   const exportData: any[] = [];
   
   for (let i = 0; i < batchResult.originalFileData.length; i++) {
@@ -64,7 +65,7 @@ export function exportResultsFixed(
     exportData.push(exportRow);
   }
   
-  console.log(`[FIXED EXPORTER] Successfully exported ${exportData.length} rows with perfect alignment and full data preservation`);
+  logger.info(`[FIXED EXPORTER] Successfully exported ${exportData.length} rows with perfect alignment and full data preservation`);
   return exportData;
 }
 
@@ -81,7 +82,7 @@ export function exportResultsFromClassifications(
     return exportResultsFixed(summary, true);
   }
   
-  console.warn('[FIXED EXPORTER] Fallback export mode - this should not happen in normal operation');
+  logger.warn('[FIXED EXPORTER] Fallback export mode - this should not happen in normal operation');
   
   return classifications.map((result, index) => {
     const exportRow: any = {};

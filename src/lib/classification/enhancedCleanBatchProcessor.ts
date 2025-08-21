@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
 import { balancedClassifyPayeeWithAI } from '../openai/balancedClassification';
@@ -22,7 +23,7 @@ export async function enhancedCleanProcessBatch(
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   
-  console.log(`[ENHANCED CLEAN BATCH] Starting enhanced batch processing of ${originalFileData.length} rows using column: ${selectedColumn}`);
+  logger.info(`[ENHANCED CLEAN BATCH] Starting enhanced batch processing of ${originalFileData.length} rows using column: ${selectedColumn}`);
   
   if (!originalFileData || originalFileData.length === 0) {
     throw new Error('No data provided for processing');
@@ -77,7 +78,7 @@ export async function enhancedCleanProcessBatch(
       const exclusionResult = checkKeywordExclusion(payeeName, exclusionKeywords);
       
       if (exclusionResult.isExcluded) {
-        console.log(`[ENHANCED CLEAN BATCH] EXCLUDED "${payeeName}" at row ${rowIndex} due to keywords: ${exclusionResult.matchedKeywords.join(', ')}`);
+        logger.info(`[ENHANCED CLEAN BATCH] EXCLUDED "${payeeName}" at row ${rowIndex} due to keywords: ${exclusionResult.matchedKeywords.join(', ')}`);
         const result: PayeeClassification = {
           id: `payee-${rowIndex}`,
           payeeName,
@@ -96,7 +97,7 @@ export async function enhancedCleanProcessBatch(
         excludedCount++;
       } else {
         // Process with AI
-        console.log(`[ENHANCED CLEAN BATCH] AI processing "${payeeName}" (row ${rowIndex})`);
+        logger.info(`[ENHANCED CLEAN BATCH] AI processing "${payeeName}" (row ${rowIndex})`);
         const aiResult = await balancedClassifyPayeeWithAI(payeeName);
         
         const result: PayeeClassification = {
@@ -118,7 +119,7 @@ export async function enhancedCleanProcessBatch(
       }
       
     } catch (error) {
-      console.error(`[ENHANCED CLEAN BATCH] Error processing row ${rowIndex}:`, error);
+      logger.error(`[ENHANCED CLEAN BATCH] Error processing row ${rowIndex}:`, error);
       
       const payeeName = String(rowData[selectedColumn] || '').trim();
       const result: PayeeClassification = {
@@ -166,7 +167,7 @@ export async function enhancedCleanProcessBatch(
   
   // Validation
   if (results.length !== originalFileData.length) {
-    console.error(`[ENHANCED CLEAN BATCH] CRITICAL: Result count mismatch! Expected: ${originalFileData.length}, Got: ${results.length}`);
+    logger.error(`[ENHANCED CLEAN BATCH] CRITICAL: Result count mismatch! Expected: ${originalFileData.length}, Got: ${results.length}`);
     throw new Error(`Result alignment error: Expected ${originalFileData.length} results, got ${results.length}`);
   }
   
@@ -175,11 +176,11 @@ export async function enhancedCleanProcessBatch(
   const individualCount = results.filter(r => r.result.classification === 'Individual').length;
   const averageConfidence = results.reduce((sum, r) => sum + r.result.confidence, 0) / results.length;
   
-  console.log(`[ENHANCED CLEAN BATCH] ===== PROCESSING COMPLETE =====`);
-  console.log(`[ENHANCED CLEAN BATCH] Total processed: ${results.length} payees`);
-  console.log(`[ENHANCED CLEAN BATCH] Classification breakdown: ${businessCount} Business, ${individualCount} Individual`);
-  console.log(`[ENHANCED CLEAN BATCH] Processing breakdown: ${aiProcessedCount} AI-processed, ${excludedCount} excluded by keywords, ${errorCount} errors`);
-  console.log(`[ENHANCED CLEAN BATCH] Processing time: ${(processingTime / 1000).toFixed(1)} seconds`);
+  logger.info(`[ENHANCED CLEAN BATCH] ===== PROCESSING COMPLETE =====`);
+  logger.info(`[ENHANCED CLEAN BATCH] Total processed: ${results.length} payees`);
+  logger.info(`[ENHANCED CLEAN BATCH] Classification breakdown: ${businessCount} Business, ${individualCount} Individual`);
+  logger.info(`[ENHANCED CLEAN BATCH] Processing breakdown: ${aiProcessedCount} AI-processed, ${excludedCount} excluded by keywords, ${errorCount} errors`);
+  logger.info(`[ENHANCED CLEAN BATCH] Processing time: ${(processingTime / 1000).toFixed(1)} seconds`);
   
   return {
     results,

@@ -1,3 +1,4 @@
+import { logger } from '../../logger';
 
 import { ExportRow, ExportContext } from './types';
 import { createResultsMap, mergeRowWithResult } from './resultsMerger';
@@ -13,7 +14,7 @@ export function exportResultsWithOriginalDataV3(
   batchResult: any,
   includeAllColumns: boolean = true
 ): ExportRow[] {
-  console.log('[MAIN EXPORTER] Processing batch result with GUARANTEED alignment:', {
+  logger.info('[MAIN EXPORTER] Processing batch result with GUARANTEED alignment:', {
     hasOriginalData: !!batchResult.originalFileData,
     originalDataLength: batchResult.originalFileData?.length || 0,
     resultsLength: batchResult.results.length,
@@ -24,7 +25,7 @@ export function exportResultsWithOriginalDataV3(
     return createFallbackExportData(batchResult.results);
   }
 
-  console.log('[MAIN EXPORTER] Merging with PERFECT 1:1 correspondence - no fallbacks, no misalignment');
+  logger.info('[MAIN EXPORTER] Merging with PERFECT 1:1 correspondence - no fallbacks, no misalignment');
   
   // Create results map for efficient lookup by row index
   const resultsMap = createResultsMap(batchResult.results);

@@ -1,10 +1,4 @@
-import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
-import { enhancedClassifyPayeeV3 } from './enhancedClassificationV3';
-import { DEFAULT_CLASSIFICATION_CONFIG, MAX_CONCURRENCY } from './config';
-import { processPayeeDeduplication } from './batchDeduplication';
-import { handleBatchRetries } from './batchRetryHandler';
-import { calculateBatchStatistics, logBatchStatistics } from './batchStatistics';
-import { exportResultsWithOriginalDataV3 } from './exporters';
+import { logger } from '../logger';
 
 /**
  * Enhanced V3 batch processor with no failures and intelligent processing
@@ -16,7 +10,7 @@ export async function enhancedProcessBatchV3(
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   
-  console.log(`[V3 Batch] Starting batch processing of ${payeeNames.length} payees with intelligent escalation`);
+  logger.info(`[V3 Batch] Starting batch processing of ${payeeNames.length} payees with intelligent escalation`);
   
   // Enhanced deduplication with fuzzy matching
   const { processQueue, results, duplicateCache } = processPayeeDeduplication(
@@ -33,7 +27,7 @@ export async function enhancedProcessBatchV3(
   
   for (let i = 0; i < processQueue.length; i += batchSize) {
     const batch = processQueue.slice(i, i + batchSize);
-    console.log(`[V3 Batch] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(processQueue.length / batchSize)} (${batch.length} items)`);
+    logger.info(`[V3 Batch] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(processQueue.length / batchSize)} (${batch.length} items)`);
     
     const batchPromises = batch.map(async (item) => {
       try {
@@ -53,13 +47,13 @@ export async function enhancedProcessBatchV3(
         
         totalProcessed++;
         if (totalProcessed % 50 === 0) {
-          console.log(`[V3 Batch] Progress: ${totalProcessed}/${processQueue.length} processed`);
+          logger.info(`[V3 Batch] Progress: ${totalProcessed}/${processQueue.length} processed`);
         }
         
         return payeeClassification;
         
       } catch (error) {
-        console.error(`[V3 Batch] Unexpected error processing "${item.name}":`, error);
+        logger.error(`[V3 Batch] Unexpected error processing "${item.name}":`, error);
         
         // Add to retry queue for second attempt
         retryQueue.push(item);

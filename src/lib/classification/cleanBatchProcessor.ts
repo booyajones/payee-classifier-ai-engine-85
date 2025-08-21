@@ -1,3 +1,4 @@
+import { logger } from '../logger';
 
 import { PayeeClassification, BatchProcessingResult, ClassificationConfig } from '../types';
 import { balancedClassifyPayeeWithAI } from '../openai/balancedClassification';
@@ -15,7 +16,7 @@ export async function cleanProcessBatch(
 ): Promise<BatchProcessingResult> {
   const startTime = Date.now();
   
-  console.log(`[CLEAN BATCH] Starting clean batch processing of ${originalFileData.length} rows using column: ${selectedColumn}`);
+  logger.info(`[CLEAN BATCH] Starting clean batch processing of ${originalFileData.length} rows using column: ${selectedColumn}`);
   
   if (!originalFileData || originalFileData.length === 0) {
     throw new Error('No data provided for processing');
@@ -27,8 +28,8 @@ export async function cleanProcessBatch(
   
   // Get the comprehensive exclusion keywords
   const exclusionKeywords = getComprehensiveExclusionKeywords();
-  console.log(`[CLEAN BATCH] Loaded ${exclusionKeywords.length} exclusion keywords for processing`);
-  console.log(`[CLEAN BATCH] Sample keywords: ${exclusionKeywords.slice(0, 10).join(', ')}`);
+  logger.info(`[CLEAN BATCH] Loaded ${exclusionKeywords.length} exclusion keywords for processing`);
+  logger.info(`[CLEAN BATCH] Sample keywords: ${exclusionKeywords.slice(0, 10).join(', ')}`);
   
   const results: PayeeClassification[] = [];
   let excludedCount = 0;
@@ -41,8 +42,8 @@ export async function cleanProcessBatch(
     
     // Show progress every 10 rows
     if (rowIndex % 10 === 0) {
-      console.log(`[CLEAN BATCH] Processing row ${rowIndex + 1} of ${originalFileData.length} (${Math.round((rowIndex / originalFileData.length) * 100)}%)`);
-      console.log(`[CLEAN BATCH] Progress so far: ${excludedCount} excluded, ${aiProcessedCount} AI processed, ${errorCount} errors`);
+      logger.info(`[CLEAN BATCH] Processing row ${rowIndex + 1} of ${originalFileData.length} (${Math.round((rowIndex / originalFileData.length) * 100)}%)`);
+      logger.info(`[CLEAN BATCH] Progress so far: ${excludedCount} excluded, ${aiProcessedCount} AI processed, ${errorCount} errors`);
     }
     
     try {
@@ -74,7 +75,7 @@ export async function cleanProcessBatch(
       const exclusionResult = checkKeywordExclusion(payeeName, exclusionKeywords);
       
       if (exclusionResult.isExcluded) {
-        console.log(`[CLEAN BATCH] EXCLUDED "${payeeName}" at row ${rowIndex} due to keywords: ${exclusionResult.matchedKeywords.join(', ')}`);
+        logger.info(`[CLEAN BATCH] EXCLUDED "${payeeName}" at row ${rowIndex} due to keywords: ${exclusionResult.matchedKeywords.join(', ')}`);
         const result: PayeeClassification = {
           id: `payee-${rowIndex}`,
           payeeName,
@@ -95,7 +96,7 @@ export async function cleanProcessBatch(
       }
       
       // Process with AI - each name individually
-      console.log(`[CLEAN BATCH] AI processing "${payeeName}" (row ${rowIndex})`);
+      logger.info(`[CLEAN BATCH] AI processing "${payeeName}" (row ${rowIndex})`);
       const aiResult = await balancedClassifyPayeeWithAI(payeeName);
       
       const result: PayeeClassification = {
@@ -116,7 +117,7 @@ export async function cleanProcessBatch(
       aiProcessedCount++;
       
     } catch (error) {
-      console.error(`[CLEAN BATCH] Error processing row ${rowIndex}:`, error);
+      logger.error(`[CLEAN BATCH] Error processing row ${rowIndex}:`, error);
       
       const payeeName = String(rowData[selectedColumn] || '').trim();
       
@@ -147,7 +148,7 @@ export async function cleanProcessBatch(
   
   // Critical validation - ensure perfect alignment
   if (results.length !== originalFileData.length) {
-    console.error(`[CLEAN BATCH] CRITICAL: Result count mismatch! Expected: ${originalFileData.length}, Got: ${results.length}`);
+    logger.error(`[CLEAN BATCH] CRITICAL: Result count mismatch! Expected: ${originalFileData.length}, Got: ${results.length}`);
     throw new Error(`Result alignment error: Expected ${originalFileData.length} results, got ${results.length}`);
   }
   
@@ -157,12 +158,12 @@ export async function cleanProcessBatch(
     const result = results[i];
     
     if (result.rowIndex !== i) {
-      console.error(`[CLEAN BATCH] CRITICAL: Index mismatch at position ${i}, result has rowIndex ${result.rowIndex}`);
+      logger.error(`[CLEAN BATCH] CRITICAL: Index mismatch at position ${i}, result has rowIndex ${result.rowIndex}`);
       throw new Error(`Index alignment error at position ${i}: expected rowIndex ${i}, got ${result.rowIndex}`);
     }
     
     if (seenIndices.has(result.rowIndex)) {
-      console.error(`[CLEAN BATCH] CRITICAL: Duplicate rowIndex ${result.rowIndex} found`);
+      logger.error(`[CLEAN BATCH] CRITICAL: Duplicate rowIndex ${result.rowIndex} found`);
       throw new Error(`Duplicate rowIndex ${result.rowIndex} detected`);
     }
     
@@ -176,15 +177,15 @@ export async function cleanProcessBatch(
   const individualCount = results.filter(r => r.result.classification === 'Individual').length;
   const averageConfidence = results.reduce((sum, r) => sum + r.result.confidence, 0) / results.length;
   
-  console.log(`[CLEAN BATCH] ===== PROCESSING COMPLETE =====`);
-  console.log(`[CLEAN BATCH] Total processed: ${results.length} payees`);
-  console.log(`[CLEAN BATCH] Classification breakdown: ${businessCount} Business, ${individualCount} Individual`);
-  console.log(`[CLEAN BATCH] Processing breakdown: ${aiProcessedCount} AI-processed, ${excludedCount} excluded by keywords, ${errorCount} errors`);
-  console.log(`[CLEAN BATCH] Business rate: ${((businessCount / results.length) * 100).toFixed(1)}%`);
-  console.log(`[CLEAN BATCH] Keyword exclusion rate: ${((excludedCount / results.length) * 100).toFixed(1)}%`);
-  console.log(`[CLEAN BATCH] Average confidence: ${averageConfidence.toFixed(1)}%`);
-  console.log(`[CLEAN BATCH] Processing time: ${(processingTime / 1000).toFixed(1)} seconds`);
-  console.log(`[CLEAN BATCH] Index validation: All ${results.length} results have perfect 1:1 alignment`);
+  logger.info(`[CLEAN BATCH] ===== PROCESSING COMPLETE =====`);
+  logger.info(`[CLEAN BATCH] Total processed: ${results.length} payees`);
+  logger.info(`[CLEAN BATCH] Classification breakdown: ${businessCount} Business, ${individualCount} Individual`);
+  logger.info(`[CLEAN BATCH] Processing breakdown: ${aiProcessedCount} AI-processed, ${excludedCount} excluded by keywords, ${errorCount} errors`);
+  logger.info(`[CLEAN BATCH] Business rate: ${((businessCount / results.length) * 100).toFixed(1)}%`);
+  logger.info(`[CLEAN BATCH] Keyword exclusion rate: ${((excludedCount / results.length) * 100).toFixed(1)}%`);
+  logger.info(`[CLEAN BATCH] Average confidence: ${averageConfidence.toFixed(1)}%`);
+  logger.info(`[CLEAN BATCH] Processing time: ${(processingTime / 1000).toFixed(1)} seconds`);
+  logger.info(`[CLEAN BATCH] Index validation: All ${results.length} results have perfect 1:1 alignment`);
   
   return {
     results,
