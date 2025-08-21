@@ -53,7 +53,11 @@ export async function processWithHybridBatch(
   stats.phase = 'Applying keyword exclusions';
   onProgress?.(0, payeeNames.length, 0, stats);
 
-  const exclusionResults = payeeNames.map(name => checkKeywordExclusion(name));
+  const exclusionResults = payeeNames.map(name =>
+    typeof name === 'string' && name.trim()
+      ? checkKeywordExclusion(name)
+      : { isExcluded: false, matchedKeywords: [], originalName: String(name) }
+  );
   
   // Separate excluded vs. needs AI processing
   const needsAI: { name: string; index: number }[] = [];
@@ -63,6 +67,15 @@ export async function processWithHybridBatch(
     reasoning: string;
     processingTier: 'Rule-Based' | 'AI-Powered' | 'Failed' | 'NLP-Based' | 'AI-Assisted' | 'Excluded';
   } | null> = payeeNames.map((name, index) => {
+    const validName = typeof name === 'string' ? name.trim() : '';
+    if (!validName) {
+      return {
+        classification: 'Individual' as const,
+        confidence: 0,
+        reasoning: 'Invalid payee name',
+        processingTier: 'Failed' as const
+      };
+    }
     const exclusionResult = exclusionResults[index];
     if (exclusionResult.isExcluded) {
       stats.keywordExcluded++;
@@ -73,7 +86,7 @@ export async function processWithHybridBatch(
         processingTier: 'Rule-Based' as const
       };
     } else {
-      needsAI.push({ name, index });
+      needsAI.push({ name: validName, index });
       return null; // Placeholder
     }
   });

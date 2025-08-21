@@ -613,12 +613,12 @@ export function checkKeywordExclusion(
 ): ExclusionResult {
   console.log(`[KEYWORD EXCLUSION] Testing "${payeeName}" against ${exclusionKeywords.length} keywords`);
   
-  if (!payeeName || typeof payeeName !== 'string') {
+  if (typeof payeeName !== 'string' || !payeeName.trim()) {
     console.log(`[KEYWORD EXCLUSION] Invalid input: "${payeeName}"`);
     return {
-      isExcluded: true,
-      matchedKeywords: ['invalid-input'],
-      originalName: payeeName
+      isExcluded: false,
+      matchedKeywords: [],
+      originalName: String(payeeName)
     };
   }
 
@@ -666,7 +666,11 @@ export function filterPayeeNames(
   const excludedNames: Array<{ name: string; reason: string[] }> = [];
   const processedNames = new Set<string>(); // Prevent duplicates
 
-  for (const name of payeeNames) {
+  for (const rawName of payeeNames) {
+    const name = typeof rawName === 'string' ? rawName.trim() : '';
+    if (!name) {
+      continue; // skip invalid names
+    }
     // Skip if we've already processed this exact name
     if (processedNames.has(name)) {
       continue;
@@ -674,7 +678,7 @@ export function filterPayeeNames(
     processedNames.add(name);
 
     const exclusionResult = checkKeywordExclusion(name, exclusionKeywords);
-    
+
     if (exclusionResult.isExcluded) {
       excludedNames.push({
         name: name,

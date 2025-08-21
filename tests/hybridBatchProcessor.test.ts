@@ -57,6 +57,18 @@ describe('processWithHybridBatch', () => {
     createBatchJob.mockRejectedValue(new Error('boom'));
     await expect(processWithHybridBatch(['Acme LLC'], 'batch')).rejects.toThrow('Failed to create batch job: boom');
   });
+
+  it('handles invalid names without sending them to AI', async () => {
+    optimizedBatchClassification.mockResolvedValue([
+      { payeeName: 'Acme LLC', classification: 'Business', confidence: 98, reasoning: 'mock' }
+    ]);
+
+    const result = await processWithHybridBatch(['Acme LLC', '' as any], 'realtime');
+
+    expect(optimizedBatchClassification).toHaveBeenCalledWith(['Acme LLC'], 30000);
+    expect(result.results[1].processingTier).toBe('Failed');
+    expect(result.results[1].reasoning).toContain('Invalid payee name');
+  });
 });
 
 describe('completeBatchJob', () => {
