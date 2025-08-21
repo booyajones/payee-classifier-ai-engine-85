@@ -6,6 +6,17 @@ import { ClassificationResult } from '../types';
  * This provides intelligent classification without requiring external API keys
  */
 export async function applyAIClassification(payeeName: string): Promise<ClassificationResult> {
+  // Validate input
+  if (typeof payeeName !== 'string' || payeeName.trim().length === 0) {
+    return {
+      classification: 'Unknown',
+      confidence: 0,
+      reasoning: 'Invalid or empty payee name provided.',
+      processingTier: 'AI-Assisted' as const,
+      matchingRules: []
+    };
+  }
+
   // Simulate AI processing time
   await new Promise(resolve => setTimeout(resolve, 100));
   
