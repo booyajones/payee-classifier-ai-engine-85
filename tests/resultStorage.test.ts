@@ -1,11 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
+import { promptVersion } from '@/lib/classification/config';
 
 vi.mock('@/lib/backend', () => {
   const upsertUploadBatch = vi.fn().mockResolvedValue('batch123');
-  const upsertUploadRows = vi.fn().mockImplementation(async (rows: any[]) =>
-    rows.map((r, idx) => ({ ...r, id: idx + 1 }))
-  );
-  const upsertClassifications = vi.fn().mockResolvedValue(undefined);
+  const upsertUploadRows = vi
+    .fn()
+    .mockImplementation(async (rows: Record<string, unknown>[]) =>
+      rows.map((r, idx) => ({ ...r, id: idx + 1 }))
+    );
+  const upsertClassifications = vi
+    .fn<[Record<string, unknown>[]], Promise<void>>()
+    .mockResolvedValue(undefined);
   return {
     isSupabaseConfigured: () => true,
     upsertUploadBatch,
@@ -62,7 +67,7 @@ describe('saveProcessingResults', () => {
 
     // upload rows should be sent in a single batch
     expect(upsertUploadRows).toHaveBeenCalledTimes(1);
-    const savedRows = (upsertUploadRows as any).mock.calls[0][0] as any[];
+    const savedRows = upsertUploadRows.mock.calls[0][0] as Record<string, unknown>[];
 
     expect(savedRows[0]).toMatchObject({
       payee_name: 'Acme LLC',
@@ -76,9 +81,10 @@ describe('saveProcessingResults', () => {
 
     // classifications should also be buffered and saved once
     expect(upsertClassifications).toHaveBeenCalledTimes(1);
-    const savedClassifications = (upsertClassifications as any).mock.calls[0][0] as any[];
+    const savedClassifications = upsertClassifications.mock
+      .calls[0][0] as Record<string, unknown>[];
     expect(savedClassifications).toHaveLength(2);
-    expect(savedClassifications[0]).toMatchObject({ prompt_version: 1 });
+    expect(savedClassifications[0]).toMatchObject({ prompt_version: promptVersion });
   });
 });
 
