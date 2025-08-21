@@ -7,6 +7,8 @@ import { handleBatchRetries } from './batchRetryHandler';
 import { calculateBatchStatistics, logBatchStatistics } from './batchStatistics';
 import { exportResultsWithOriginalDataV3 } from './exporters';
 import { applyRuleBasedClassification } from './ruleBasedClassification';
+import { calculateCombinedSimilarity } from './stringMatching';
+import { upsertDedupeLinks } from '@/lib/backend';
 
 /**
  * Enhanced V3 batch processor with no failures and intelligent processing
@@ -98,9 +100,34 @@ export async function enhancedProcessBatchV3(
     retryQueue,
     processingTime
   );
-  
+
   logBatchStatistics(enhancedStats, results);
-  
+
+  // Persist high-confidence fuzzy duplicate links
+  if (config.useFuzzyMatching) {
+    const dedupeLinks: { canonical_normalized: string; duplicate_normalized: string }[] = [];
+    const cacheKeys = Array.from(duplicateCache.keys());
+    const threshold = config.similarityThreshold ?? 90;
+
+    for (let i = 0; i < cacheKeys.length; i++) {
+      for (let j = i + 1; j < cacheKeys.length; j++) {
+        const canonical = cacheKeys[i];
+        const duplicate = cacheKeys[j];
+        const similarity = calculateCombinedSimilarity(canonical, duplicate).combined;
+        if (similarity >= threshold) {
+          dedupeLinks.push({
+            canonical_normalized: canonical,
+            duplicate_normalized: duplicate
+          });
+        }
+      }
+    }
+
+    if (dedupeLinks.length) {
+      await upsertDedupeLinks(dedupeLinks);
+    }
+  }
+
   return {
     results,
     successCount: results.length,

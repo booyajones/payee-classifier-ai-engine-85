@@ -81,7 +81,6 @@ export const saveProcessingResults = async (
     row_id: row.id as number,
     prompt_version: PROMPT_VERSION,
     classification: results[idx].result,
-    prompt_version: promptVersion,
   }));
   await upsertClassifications(classificationBuffer);
 
