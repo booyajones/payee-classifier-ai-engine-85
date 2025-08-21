@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { BatchJob } from "@/lib/openai/trueBatchAPI";
 import { logger } from "@/lib/logger";
 import { isOpenAIInitialized, testOpenAIConnection } from "@/lib/openai/client";
+import { createHash } from "crypto";
 
 interface UseFileUploadProps {
   onBatchJobCreated: (batchJob: BatchJob, payeeNames: string[], originalFileData: any[]) => void;
@@ -18,8 +19,8 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
   const submitFileForProcessing = async (validationResult: any, selectedColumn: string) => {
     logger.info('[FILE UPLOAD] === STARTING BATCH JOB CREATION ===');
     logger.info('[FILE UPLOAD] Validation result:', {
-      hasPayeeNames: !!validationResult?.payeeNames,
-      payeeCount: validationResult?.payeeNames?.length || 0,
+      hasPayees: !!validationResult?.payees,
+      payeeCount: validationResult?.payees?.length || 0,
       selectedColumn,
       hasOriginalData: !!validationResult?.originalData,
       originalDataLength: validationResult?.originalData?.length || 0
@@ -37,7 +38,7 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       return;
     }
 
-    if (!validationResult.payeeNames || validationResult.payeeNames.length === 0) {
+    if (!validationResult.payees || validationResult.payees.length === 0) {
       const error = "No payee names found in validation result";
       logger.error('[FILE UPLOAD] No payee names:', error);
       toast({
@@ -61,8 +62,8 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
     }
 
     // Verify data alignment
-    if (validationResult.originalData.length !== validationResult.payeeNames.length) {
-      const error = `Data alignment error: ${validationResult.originalData.length} original rows vs ${validationResult.payeeNames.length} payee names`;
+    if (validationResult.originalData.length !== validationResult.payees.length) {
+      const error = `Data alignment error: ${validationResult.originalData.length} original rows vs ${validationResult.payees.length} payee names`;
       logger.error('[FILE UPLOAD] Data alignment error:', error);
       toast({
         title: "Data Alignment Error",
@@ -96,19 +97,31 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       }
       logger.info('[FILE UPLOAD] OpenAI connection test passed');
 
+      const hashName = (name: string) =>
+        createHash("sha256").update(name).digest("hex");
+      const uniqueMap = new Map<string, { raw: string; row: any }>();
+      validationResult.payees.forEach((p: any, idx: number) => {
+        const hash = hashName(p.norm_name);
+        if (!uniqueMap.has(hash)) {
+          uniqueMap.set(hash, { raw: p.raw_name, row: validationResult.originalData[idx] });
+        }
+      });
+      const uniquePayeeNames = Array.from(uniqueMap.values()).map(v => v.raw);
+      const uniqueOriginalData = Array.from(uniqueMap.values()).map(v => v.row);
+
       // Show immediate feedback
       toast({
         title: "Creating Batch Job",
-        description: `Preparing to process ${validationResult.payeeNames.length} payees with full data preservation...`,
+        description: `Preparing to process ${uniquePayeeNames.length} unique payees with full data preservation...`,
       });
 
       logger.info('[FILE UPLOAD] Importing createBatchJob function...');
       const { createBatchJob } = await import("@/lib/openai/trueBatchAPI");
-      
+
       logger.info('[FILE UPLOAD] Calling createBatchJob with:', {
-        payeeCount: validationResult.payeeNames.length,
-        originalDataCount: validationResult.originalData.length,
-        description: `Payee classification for ${validationResult.payeeNames.length} payees from ${selectedColumn} column`
+        payeeCount: uniquePayeeNames.length,
+        originalDataCount: uniqueOriginalData.length,
+        description: `Payee classification for ${uniquePayeeNames.length} payees from ${selectedColumn} column`
       });
 
       // Add timeout wrapper for the API call
@@ -118,8 +131,8 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
 
       const batchJob = await Promise.race([
         createBatchJob(
-          validationResult.payeeNames,
-          `Payee classification for ${validationResult.payeeNames.length} payees from ${selectedColumn} column`
+          uniquePayeeNames,
+          `Payee classification for ${uniquePayeeNames.length} payees from ${selectedColumn} column`
         ),
         timeoutPromise
       ]) as BatchJob;
@@ -141,8 +154,8 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       logger.info('[FILE UPLOAD] Calling onBatchJobCreated callback with preserved original data...');
       await onBatchJobCreated(
         batchJob,
-        validationResult.payeeNames,
-        validationResult.originalData // Always pass the complete original data
+        uniquePayeeNames,
+        uniqueOriginalData
       );
       logger.info('[FILE UPLOAD] ✅ onBatchJobCreated callback completed successfully with data preservation');
       
@@ -150,7 +163,7 @@ export const useFileUpload = ({ onBatchJobCreated }: UseFileUploadProps) => {
       logger.error('[FILE UPLOAD] ❌ Batch job creation failed:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        payeeCount: validationResult.payeeNames?.length,
+        payeeCount: validationResult.payees?.length,
         originalDataCount: validationResult.originalData?.length,
         selectedColumn
       });

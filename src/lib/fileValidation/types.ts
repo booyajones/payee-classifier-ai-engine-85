@@ -1,5 +1,11 @@
+export interface PayeeRecord {
+  raw_name: string;
+  norm_name: string;
+}
+
 export interface ValidationResult {
-  payeeNames: string[];
+  payees: PayeeRecord[];
+  payeeNames: string[]; // raw names for backward compatibility
   originalData: any[];
   payeeColumnName?: string;
   error?: Error;
