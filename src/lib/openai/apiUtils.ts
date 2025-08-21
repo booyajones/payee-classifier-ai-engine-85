@@ -1,6 +1,5 @@
 import { logger } from "../logger";
 
-import { timeoutPromise } from './utils';
 
 interface RequestConfig {
   timeout?: number;
@@ -25,7 +24,7 @@ export class APIError extends Error {
  * Enhanced API request wrapper with timeout, retries, rate limit handling, and error handling
  */
 export async function makeAPIRequest<T>(
-  requestFn: () => Promise<T>,
+  requestFn: (signal: AbortSignal) => Promise<T>,
   config: RequestConfig = {}
 ): Promise<T> {
   const {
@@ -39,34 +38,48 @@ export async function makeAPIRequest<T>(
   let consecutiveRateLimits = 0;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    let controller: AbortController;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     try {
       logger.info(`[API] Attempt ${attempt + 1}/${retries + 1}${isStatusCheck ? ' (status check)' : ''}`);
-      
+
       // Apply rate limit backoff
       if (consecutiveRateLimits > 0) {
         const rateLimitDelay = Math.min(5000 * Math.pow(2, consecutiveRateLimits - 1), 60000);
         logger.info(`[API] Rate limit backoff: waiting ${rateLimitDelay}ms`);
         await new Promise(resolve => setTimeout(resolve, rateLimitDelay));
       }
-      
-      const result = await timeoutPromise(requestFn(), timeout);
-      
+
+      controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const result = await requestFn(controller.signal);
+
+      clearTimeout(timeoutId);
+
       if (attempt > 0) {
         logger.info(`[API] Request succeeded after ${attempt + 1} attempts`);
       }
-      
+
       return result;
     } catch (error) {
-      lastError = error as Error;
-      
+      const err = error as Error;
+      lastError = err;
+
+      clearTimeout(timeoutId);
+
+      // If the controller was aborted, treat as timeout
+      const isTimeout = controller.signal.aborted || err.name === 'AbortError' || err.message.includes('timed out');
+
       // Check for specific error types
-      const errorMessage = lastError.message.toLowerCase();
-      const isTimeout = lastError.message.includes('timed out');
-      const isRateLimit = errorMessage.includes('429') || 
-                         errorMessage.includes('rate limit') || 
+      const errorMessage = err.message.toLowerCase();
+      const isRateLimit = errorMessage.includes('429') ||
+                         errorMessage.includes('rate limit') ||
                          errorMessage.includes('quota exceeded');
-      
+
       if (isTimeout) {
+        controller.abort();
         logger.error(`[API] Request timed out after ${timeout}ms (attempt ${attempt + 1})`);
         lastError = new APIError(`Request timed out after ${timeout}ms`, undefined, true, false);
       } else if (isRateLimit) {

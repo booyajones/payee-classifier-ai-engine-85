@@ -13,7 +13,7 @@ vi.mock('@/lib/openai/client', () => ({
 }));
 
 vi.mock('@/lib/openai/apiUtils', () => ({
-  makeAPIRequest: async (fn: any) => fn(),
+  makeAPIRequest: async (fn: any) => fn(new AbortController().signal),
   logMemoryUsage: vi.fn()
 }));
 
@@ -37,12 +37,15 @@ describe('createBatchJob', () => {
     const job = await createBatchJob(['A', 'B'], 'desc');
 
     expect(fileCreate).toHaveBeenCalled();
-    expect(batchCreate).toHaveBeenCalledWith({
-      input_file_id: 'file1',
-      endpoint: '/v1/chat/completions',
-      completion_window: '24h',
-      metadata: { payee_count: '2', description: 'desc' }
-    });
+    expect(batchCreate).toHaveBeenCalledWith(
+      {
+        input_file_id: 'file1',
+        endpoint: '/v1/chat/completions',
+        completion_window: '24h',
+        metadata: { payee_count: '2', description: 'desc' }
+      },
+      expect.anything()
+    );
     expect(job.id).toBe('batch1');
     // payee_count is stored as a string in the returned metadata
     expect(job.metadata?.payee_count).toBe('2');
@@ -73,7 +76,7 @@ describe('getBatchJobResults', () => {
 
     const results = await getBatchJobResults(job, ['A', 'B']);
 
-    expect(fileContent).toHaveBeenCalledWith('file1');
+    expect(fileContent).toHaveBeenCalledWith('file1', expect.anything());
     expect(results[0].entity_type).toBe('Business');
     expect(results[0].sic_code).toBe('1234');
     expect(results[1].entity_type).toBe('Individual');

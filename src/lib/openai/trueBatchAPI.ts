@@ -107,7 +107,7 @@ export async function checkBatchJobStatus(jobId: string): Promise<BatchJob> {
     }
 
     const result = await makeAPIRequest(
-      () => openaiClient.batches.retrieve(jobId),
+      (signal) => openaiClient.batches.retrieve(jobId, { signal }),
       { isStatusCheck: true, retries: 3, retryDelay: 2000 }
     );
 
@@ -186,10 +186,10 @@ export async function createBatchJob(
     
     // Upload file with retry
     const uploadedFile = await makeAPIRequest(
-      () => openaiClient.files.create({
+      (signal) => openaiClient.files.create({
         file: file,
         purpose: 'batch'
-      }),
+      }, { signal }),
       { retries: 2, retryDelay: 3000 }
     );
 
@@ -198,7 +198,7 @@ export async function createBatchJob(
     // Create batch job with retry
     logger.info("[BATCH API] Creating batch job...");
     const result = await makeAPIRequest(
-      () => openaiClient.batches.create({
+      (signal) => openaiClient.batches.create({
         input_file_id: uploadedFile.id,
         endpoint: '/v1/chat/completions',
         completion_window: '24h',
@@ -206,7 +206,7 @@ export async function createBatchJob(
           description: description || `Payee classification batch: ${payeeNames.length} payees`,
           payee_count: payeeNames.length.toString()
         }
-      }),
+      }, { signal }),
       { retries: 2, retryDelay: 3000 }
     );
 
@@ -248,22 +248,25 @@ async function retryClassification(payeeName: string): Promise<{ entity_type: st
       throw new Error('OpenAI client not initialized. Please check your API key.');
     }
 
-    const response = await makeAPIRequest(() => openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert at analyzing payee names. Determine if the name represents a Business or an Individual and return an appropriate SIC code with a confidence score.',
-        },
-        {
-          role: 'user',
-          content: `Classify this payee name: "${payeeName}"\n\nReturn a JSON object with the following fields:\n- entity_type: \"Business\" or \"Individual\"\n- sic_code: string\n- confidence: number from 0-100`,
-        },
-      ],
-      response_format: { type: 'json_schema', schema: ENTITY_CLASSIFICATION_JSON_SCHEMA },
-      temperature: 0.1,
-      max_tokens: 200,
-    }), { retries: 2, retryDelay: 1000 });
+    const response = await makeAPIRequest(
+      (signal) => openaiClient.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at analyzing payee names. Determine if the name represents a Business or an Individual and return an appropriate SIC code with a confidence score.',
+          },
+          {
+            role: 'user',
+            content: `Classify this payee name: "${payeeName}"\n\nReturn a JSON object with the following fields:\n- entity_type: \"Business\" or \"Individual\"\n- sic_code: string\n- confidence: number from 0-100`,
+          },
+        ],
+        response_format: { type: 'json_schema', schema: ENTITY_CLASSIFICATION_JSON_SCHEMA },
+        temperature: 0.1,
+        max_tokens: 200,
+      }, { signal }),
+      { retries: 2, retryDelay: 1000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -309,7 +312,7 @@ export async function getBatchJobResults(
 
     // Download results with retry
     const fileContent = await makeAPIRequest(
-      () => openaiClient.files.content(job.output_file_id!),
+      (signal) => openaiClient.files.content(job.output_file_id!, { signal }),
       { retries: 3, retryDelay: 2000 }
     );
 
@@ -444,7 +447,7 @@ export async function cancelBatchJob(jobId: string): Promise<BatchJob> {
     }
 
     const result = await makeAPIRequest(
-      () => openaiClient.batches.cancel(jobId),
+      (signal) => openaiClient.batches.cancel(jobId, { signal }),
       { retries: 2, retryDelay: 2000 }
     );
 
