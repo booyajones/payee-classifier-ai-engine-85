@@ -85,7 +85,6 @@ export const saveProcessingResults = async (
   const classificationBuffer = insertedRows.map((row, idx) => ({
     row_id: row.id as number,
     classification: results[idx].result,
-    prompt_version: promptVersion,
   }));
   await upsertClassifications(classificationBuffer);
 
