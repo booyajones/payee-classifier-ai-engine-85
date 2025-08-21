@@ -45,7 +45,13 @@ const LiveProgressDashboard = () => {
           const estimatedTotal = job.processingSpeed && job.processingSpeed > 0
             ? (job.totalRows / job.processingSpeed) * 60
             : 0;
-          const remainingTime = job.eta ?? (estimatedTotal - elapsedTime);
+          const remainingTime = job.etaSeconds ?? (estimatedTotal - elapsedTime);
+          const lowConfidencePct = job.totalRows > 0
+            ? ((job.lowConfidence ?? 0) / job.totalRows) * 100
+            : 0;
+          const duplicatesPct = job.totalRows > 0
+            ? ((job.duplicatesFound ?? 0) / job.totalRows) * 100
+            : 0;
 
           return (
             <div key={job.id} className="border rounded-lg p-4 space-y-3">
@@ -107,6 +113,27 @@ const LiveProgressDashboard = () => {
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   <span>Failed: {job.failed ?? 0}</span>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Low confidence: {job.lowConfidence ?? 0}</span>
+                  <span>{lowConfidencePct.toFixed(1)}%</span>
+                </div>
+                <Progress value={lowConfidencePct} className="h-2" />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Duplicates: {job.duplicatesFound ?? 0}</span>
+                  <span>{duplicatesPct.toFixed(1)}%</span>
+                </div>
+                <Progress value={duplicatesPct} className="h-2" />
+              </div>
+
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary">Review Low Confidence</Button>
+                <Button size="sm" variant="secondary">Review Duplicates</Button>
               </div>
 
               {job.status === 'running' && remainingTime > 0 && (
