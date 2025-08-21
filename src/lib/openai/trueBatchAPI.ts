@@ -2,6 +2,26 @@
 import { getOpenAIClient } from './client';
 import { makeAPIRequest } from './apiUtils';
 import { logger } from '../logger';
+import { z } from 'zod';
+
+// JSON schema definition for model responses
+export const ENTITY_CLASSIFICATION_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    entity_type: { type: 'string' },
+    sic_code: { type: 'string' },
+    confidence: { type: 'number' },
+  },
+  required: ['entity_type', 'sic_code', 'confidence'],
+  additionalProperties: false,
+} as const;
+
+// Zod schema for validation
+const EntityClassificationSchema = z.object({
+  entity_type: z.string(),
+  sic_code: z.string(),
+  confidence: z.number(),
+});
 
 export interface BatchJob {
   id: string;
@@ -67,9 +87,10 @@ export interface BatchResult {
 
 export interface ProcessedBatchResult {
   status: 'success' | 'error';
-  classification?: 'Business' | 'Individual';
+  entity_type?: string;
+  sic_code?: string;
   confidence?: number;
-  reasoning?: string;
+  classification?: 'Business' | 'Individual';
   error?: string;
   originalRowIndex?: number;
 }
@@ -139,14 +160,14 @@ export async function createBatchJob(
           messages: [
             {
               role: "system",
-              content: "You are an expert at classifying payee names as either 'Business' or 'Individual'. Analyze the given name and provide a classification with confidence level and reasoning."
+              content: "You are an expert at analyzing payee names. Determine if the name represents a Business or an Individual and return an appropriate SIC code with a confidence score."
             },
             {
               role: "user",
-              content: `Classify this payee name: "${name}"\n\nRespond with a JSON object containing:\n- classification: "Business" or "Individual"\n- confidence: number from 0-100\n- reasoning: brief explanation for your decision`
+              content: `Classify this payee name: "${name}"\n\nReturn a JSON object with the following fields:\n- entity_type: \"Business\" or \"Individual\"\n- sic_code: string\n- confidence: number from 0-100`
             }
           ],
-          response_format: { type: "json_object" },
+          response_format: { type: 'json_schema', schema: ENTITY_CLASSIFICATION_JSON_SCHEMA },
           temperature: 0.1,
           max_tokens: 200
         }
@@ -214,6 +235,49 @@ export async function createBatchJob(
   }
 }
 
+// Retry a single classification using the standard prompt and schema
+async function retryClassification(payeeName: string): Promise<{ entity_type: string; sic_code: string; confidence: number } | null> {
+  try {
+    const openaiClient = await getOpenAIClient();
+    if (!openaiClient) {
+      throw new Error('OpenAI client not initialized. Please check your API key.');
+    }
+
+    const response = await makeAPIRequest(() => openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert at analyzing payee names. Determine if the name represents a Business or an Individual and return an appropriate SIC code with a confidence score.',
+        },
+        {
+          role: 'user',
+          content: `Classify this payee name: "${payeeName}"\n\nReturn a JSON object with the following fields:\n- entity_type: \"Business\" or \"Individual\"\n- sic_code: string\n- confidence: number from 0-100`,
+        },
+      ],
+      response_format: { type: 'json_schema', schema: ENTITY_CLASSIFICATION_JSON_SCHEMA },
+      temperature: 0.1,
+      max_tokens: 200,
+    }), { retries: 2, retryDelay: 1000 });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return null;
+    }
+
+    const parsed = JSON.parse(content);
+    const validation = EntityClassificationSchema.safeParse(parsed);
+    if (!validation.success) {
+      return null;
+    }
+
+    return validation.data;
+  } catch (error) {
+    logger.error(`[BATCH API] Retry classification failed for ${payeeName}:`, error);
+    return null;
+  }
+}
+
 /**
  * Download and parse the results for a completed batch job.
  */
@@ -271,34 +335,64 @@ export async function getBatchJobResults(
         
         if (originalRowIndex >= 0 && originalRowIndex < payeeNames.length) {
           if (result.response?.body?.choices?.[0]?.message?.content) {
+            const messageContent = result.response.body.choices[0].message.content;
             try {
-              const content = JSON.parse(result.response.body.choices[0].message.content);
-              results[originalRowIndex] = {
-                status: 'success',
-                classification: content.classification,
-                confidence: content.confidence,
-                reasoning: content.reasoning,
-                originalRowIndex: originalRowIndex
-              };
+              const parsed = JSON.parse(messageContent);
+              const validation = EntityClassificationSchema.safeParse(parsed);
+              if (validation.success) {
+                results[originalRowIndex] = {
+                  status: 'success',
+                  ...validation.data,
+                  classification: validation.data.entity_type as 'Business' | 'Individual',
+                  originalRowIndex: originalRowIndex,
+                };
+              } else {
+                logger.error(`[BATCH API] Schema validation failed for ${customId}:`, validation.error);
+                const retry = await retryClassification(payeeNames[originalRowIndex]);
+                if (retry) {
+                  results[originalRowIndex] = {
+                    status: 'success',
+                    ...retry,
+                    classification: retry.entity_type as 'Business' | 'Individual',
+                    originalRowIndex: originalRowIndex,
+                  };
+                } else {
+                  results[originalRowIndex] = {
+                    status: 'error',
+                    error: 'Failed schema validation',
+                    originalRowIndex: originalRowIndex,
+                  };
+                }
+              }
             } catch (parseError) {
               logger.error(`[BATCH API] Failed to parse response for ${customId}:`, parseError);
-              results[originalRowIndex] = {
-                status: 'error',
-                error: 'Failed to parse classification result',
-                originalRowIndex: originalRowIndex
-              };
+              const retry = await retryClassification(payeeNames[originalRowIndex]);
+              if (retry) {
+                results[originalRowIndex] = {
+                  status: 'success',
+                  ...retry,
+                  classification: retry.entity_type as 'Business' | 'Individual',
+                  originalRowIndex: originalRowIndex,
+                };
+              } else {
+                results[originalRowIndex] = {
+                  status: 'error',
+                  error: 'Failed to parse classification result',
+                  originalRowIndex: originalRowIndex,
+                };
+              }
             }
           } else if (result.error) {
             results[originalRowIndex] = {
               status: 'error',
               error: result.error.message,
-              originalRowIndex: originalRowIndex
+              originalRowIndex: originalRowIndex,
             };
           } else {
             results[originalRowIndex] = {
               status: 'error',
               error: 'No response data',
-              originalRowIndex: originalRowIndex
+              originalRowIndex: originalRowIndex,
             };
           }
         } else {
