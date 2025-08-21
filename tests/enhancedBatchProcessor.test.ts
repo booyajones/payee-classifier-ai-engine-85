@@ -4,11 +4,11 @@ import { enhancedProcessBatch } from '@/lib/classification/enhancedBatchProcesso
 describe('enhancedProcessBatch', () => {
   it('marks excluded names as business entities', async () => {
     const names = ['Bank of Test'];
-    const results = await enhancedProcessBatch(names);
+    const result = await enhancedProcessBatch(names);
 
-    expect(results).toHaveLength(1);
-    expect(results[0].classification).toBe('Business');
-    expect(results[0].processingTier).toBe('Excluded');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].result.classification).toBe('Business');
+    expect(result.results[0].result.processingTier).toBe('Excluded');
   });
 });
 

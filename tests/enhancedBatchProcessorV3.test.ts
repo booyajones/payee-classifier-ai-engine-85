@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DEFAULT_CLASSIFICATION_CONFIG } from '@/lib/classification/config';
 
 vi.mock('@/lib/backend', () => {
@@ -7,10 +7,10 @@ vi.mock('@/lib/backend', () => {
   };
 });
 
-import { enhancedProcessBatchV3 } from '@/lib/classification/enhancedBatchProcessorV3';
+import { enhancedProcessBatch } from '@/lib/classification/enhancedBatchProcessor';
 import { upsertDedupeLinks } from '@/lib/backend';
 
-describe('enhancedProcessBatchV3 dedupe links', () => {
+describe('enhancedProcessBatch dedupe links', () => {
   it('saves fuzzy duplicate links', async () => {
     const names = ['Acme Systems', 'Acme System'];
     const config = {
@@ -19,7 +19,7 @@ describe('enhancedProcessBatchV3 dedupe links', () => {
       similarityThreshold: 90
     };
 
-    await enhancedProcessBatchV3(names, config);
+    await enhancedProcessBatch(names, config, { strategy: 'v3' });
 
     expect(upsertDedupeLinks).toHaveBeenCalledTimes(1);
     const links = (upsertDedupeLinks as any).mock.calls[0][0];
@@ -29,3 +29,4 @@ describe('enhancedProcessBatchV3 dedupe links', () => {
     });
   });
 });
+
