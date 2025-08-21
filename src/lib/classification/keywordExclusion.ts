@@ -664,14 +664,18 @@ export function filterPayeeNames(
 } {
   const validNames: string[] = [];
   const excludedNames: Array<{ name: string; reason: string[] }> = [];
-  const processedNames = new Set<string>(); // Prevent duplicates
+  // Track processed names using a normalized representation to avoid
+  // duplicates that only differ by case or surrounding whitespace
+  const processedNames = new Set<string>();
 
   for (const name of payeeNames) {
-    // Skip if we've already processed this exact name
-    if (processedNames.has(name)) {
+    const normalizedName = name.trim().toUpperCase();
+
+    // Skip if we've already processed this name (case-insensitive)
+    if (processedNames.has(normalizedName)) {
       continue;
     }
-    processedNames.add(name);
+    processedNames.add(normalizedName);
 
     const exclusionResult = checkKeywordExclusion(name, exclusionKeywords);
     
