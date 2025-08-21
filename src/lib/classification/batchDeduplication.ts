@@ -1,6 +1,7 @@
 
 import { PayeeClassification } from '../types';
 import { calculateCombinedSimilarity } from './stringMatching';
+import { normalizePayeeName } from './nameProcessing';
 
 /**
  * Process and deduplicate payee names with fuzzy matching
@@ -11,20 +12,25 @@ export function processPayeeDeduplication(
   useFuzzyMatching = true,
   similarityThreshold = 90
 ): {
-  processQueue: Array<{ name: string; originalIndex: number; originalData?: any }>;
+  processQueue: Array<{ name: string; normalizedName: string; originalIndex: number; originalData?: any }>;
   results: PayeeClassification[];
   duplicateCache: Map<string, PayeeClassification>;
 } {
   const results: PayeeClassification[] = [];
   const processed = new Set<string>();
   const duplicateCache = new Map<string, PayeeClassification>();
-  const processQueue: Array<{ name: string; originalIndex: number; originalData?: any }> = [];
+  const processQueue: Array<{ name: string; normalizedName: string; originalIndex: number; originalData?: any }> = [];
+  const normalizationCache = new Map<string, string>();
 
   for (let i = 0; i < payeeNames.length; i++) {
     const name = payeeNames[i].trim();
     if (!name) continue;
 
-    const normalizedName = name.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    let normalizedName = normalizationCache.get(name);
+    if (!normalizedName) {
+      normalizedName = normalizePayeeName(name);
+      normalizationCache.set(name, normalizedName);
+    }
 
     // Check for exact duplicates
     if (processed.has(normalizedName)) {
@@ -67,6 +73,7 @@ export function processPayeeDeduplication(
     if (!foundFuzzyMatch) {
       processQueue.push({
         name,
+        normalizedName,
         originalIndex: i,
         originalData: originalFileData?.[i]
       });
