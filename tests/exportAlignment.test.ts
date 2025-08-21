@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { exportResultsWithOriginalDataV3 } from '@/lib/classification/batchExporter';
+import { exportResultsWithOriginalDataV3 } from '@/lib/classification/exporters';
 import type { BatchProcessingResult } from '@/lib/types';
 
 // Helper to create a basic classification result
-const createResult = (payeeName: string, classification: 'Business' | 'Individual'): any => ({
+const createResult = (payeeName: string, classification: 'Business' | 'Individual', rowIndex: number): any => ({
   payeeName,
   result: {
     classification,
@@ -12,15 +12,15 @@ const createResult = (payeeName: string, classification: 'Business' | 'Individua
     processingTier: 'AI-Powered'
   },
   timestamp: new Date('2024-01-01T00:00:00Z'),
-  rowIndex: -1 // force name based matching
+  rowIndex
 });
 
 describe('exportResultsWithOriginalDataV3 payee column matching', () => {
   it('uses the specified payee column when matching results', () => {
     const batch: BatchProcessingResult = {
       results: [
-        createResult('Acme LLC', 'Business'),
-        createResult('John Doe', 'Individual')
+        createResult('Acme LLC', 'Business', 0),
+        createResult('John Doe', 'Individual', 1)
       ],
       successCount: 2,
       failureCount: 0,
