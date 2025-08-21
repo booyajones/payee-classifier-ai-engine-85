@@ -48,9 +48,8 @@ export async function enhancedProcessBatchV3(
           rowIndex: item.originalIndex
         };
         
-        // Cache successful results
-        const normalizedName = item.name.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
-        duplicateCache.set(normalizedName, payeeClassification);
+        // Cache successful results using normalized name from deduplication
+        duplicateCache.set(item.normalizedName, payeeClassification);
         
         totalProcessed++;
         if (totalProcessed % 50 === 0) {
