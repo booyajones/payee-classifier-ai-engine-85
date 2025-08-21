@@ -31,6 +31,8 @@ export interface BatchJob {
     description?: string;
     payee_count?: string;
   };
+  estimated_time?: number;
+  status_url?: string;
 }
 
 export interface BatchResult {
@@ -189,10 +191,13 @@ export async function createBatchJob(
 
     logger.info(`[BATCH API] Batch job created successfully: ${result.id}`);
     
-    // Ensure the result matches our BatchJob interface
+    // Ensure the result matches our BatchJob interface and include polling info
+    const estimated_time = Math.max(1, Math.ceil(result.request_counts.total));
     return {
       ...result,
-      errors: result.errors || null
+      errors: result.errors || null,
+      estimated_time,
+      status_url: `/api/batches/${result.id}/status`
     } as BatchJob;
   } catch (error) {
     logger.error(`[BATCH API] Failed to create batch job:`, error);

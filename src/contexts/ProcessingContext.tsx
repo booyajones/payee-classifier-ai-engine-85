@@ -1,5 +1,11 @@
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useRef,
+} from 'react';
 
 export interface ProcessingJob {
   id: string;
@@ -14,6 +20,13 @@ export interface ProcessingJob {
   estimatedTimeRemaining?: number;
   processingSpeed?: number; // rows per minute
   lastUpdateTime: number;
+  // Server reported progress
+  queued?: number;
+  running?: number;
+  failed?: number;
+  eta?: number | null;
+  statusUrl?: string;
+  progressUrl?: string;
 }
 
 interface ProcessingContextType {
@@ -29,6 +42,66 @@ const ProcessingContext = createContext<ProcessingContextType | undefined>(undef
 
 export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeJobs, setActiveJobs] = useState<ProcessingJob[]>([]);
+  const pollingIntervals = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
+  const updateJob = useCallback((id: string, updates: Partial<ProcessingJob>) => {
+    setActiveJobs(prev => prev.map(job =>
+      job.id === id
+        ? {
+            ...job,
+            ...updates,
+            lastUpdateTime: Date.now(),
+            // Calculate processing speed if we have processed rows
+            processingSpeed: updates.processedRows ?
+              calculateProcessingSpeed(job, updates.processedRows) : job.processingSpeed
+          }
+        : job
+    ));
+  }, []);
+
+  const startPolling = useCallback((job: ProcessingJob) => {
+    if (!job.statusUrl && !job.progressUrl) return;
+
+    const poll = async () => {
+      try {
+        const urls = [job.statusUrl, job.progressUrl].filter(Boolean) as string[];
+        const responses = await Promise.all(urls.map(u => fetch(u)));
+        const datas = await Promise.all(responses.map(r => r.json()));
+        const data = datas[datas.length - 1];
+
+        const done = data.rows_done ?? job.processedRows;
+        const total = data.rows_total ?? job.totalRows;
+        const status = done >= total ? 'completed' : job.status;
+
+        updateJob(job.id, {
+          totalRows: total,
+          processedRows: done,
+          aiProcessedCount: data.running ?? job.aiProcessedCount,
+          errorCount: data.failed ?? job.errorCount,
+          queued: data.queued,
+          running: data.running,
+          failed: data.failed,
+          estimatedTimeRemaining: data.eta ?? undefined,
+          eta: data.eta,
+          status
+        });
+
+        if (status !== 'running') {
+          const interval = pollingIntervals.current.get(job.id);
+          if (interval) {
+            clearInterval(interval);
+            pollingIntervals.current.delete(job.id);
+          }
+        }
+      } catch {
+        // ignore polling errors
+      }
+    };
+
+    const interval = setInterval(poll, 5000);
+    pollingIntervals.current.set(job.id, interval);
+    poll();
+  }, [updateJob]);
 
   const addJob = useCallback((job: Omit<ProcessingJob, 'lastUpdateTime'>) => {
     const newJob: ProcessingJob = {
@@ -36,34 +109,29 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       lastUpdateTime: Date.now()
     };
     setActiveJobs(prev => [...prev, newJob]);
-  }, []);
-
-  const updateJob = useCallback((id: string, updates: Partial<ProcessingJob>) => {
-    setActiveJobs(prev => prev.map(job => 
-      job.id === id 
-        ? { 
-            ...job, 
-            ...updates, 
-            lastUpdateTime: Date.now(),
-            // Calculate processing speed if we have processed rows
-            processingSpeed: updates.processedRows ? 
-              calculateProcessingSpeed(job, updates.processedRows) : job.processingSpeed
-          }
-        : job
-    ));
-  }, []);
+    startPolling(newJob);
+  }, [startPolling]);
 
   const removeJob = useCallback((id: string) => {
     setActiveJobs(prev => prev.filter(job => job.id !== id));
+    const interval = pollingIntervals.current.get(id);
+    if (interval) {
+      clearInterval(interval);
+      pollingIntervals.current.delete(id);
+    }
   }, []);
 
   const pauseJob = useCallback((id: string) => {
     updateJob(id, { status: 'paused' });
+    const interval = pollingIntervals.current.get(id);
+    if (interval) clearInterval(interval);
   }, [updateJob]);
 
   const resumeJob = useCallback((id: string) => {
     updateJob(id, { status: 'running' });
-  }, [updateJob]);
+    const job = activeJobs.find(j => j.id === id);
+    if (job) startPolling(job);
+  }, [updateJob, activeJobs, startPolling]);
 
   return (
     <ProcessingContext.Provider value={{
