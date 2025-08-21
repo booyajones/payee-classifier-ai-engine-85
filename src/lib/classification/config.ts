@@ -1,13 +1,6 @@
 
 import { ClassificationConfig } from '../types';
-
-// Helper function to safely get environment variables
-const getEnvVar = (key: string, defaultValue: string): string => {
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key] || defaultValue;
-  }
-  return defaultValue;
-};
+import { getEnvVar } from '../utils/env';
 
 // Default classification configuration
 export const DEFAULT_CLASSIFICATION_CONFIG: ClassificationConfig = {

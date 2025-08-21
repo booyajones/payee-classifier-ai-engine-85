@@ -1,15 +1,9 @@
 
 
+import { getEnvVar } from '../utils/env';
+
 // Optimized timeout for better reliability and speed
 export const DEFAULT_API_TIMEOUT = 20000; // 20 seconds for batch processing
-
-// Helper function to safely get environment variables
-const getEnvVar = (key: string, defaultValue: string): string => {
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key] || defaultValue;
-  }
-  return defaultValue;
-};
 
 // Optimized batch size for faster processing
 const envBatchSize = parseInt(getEnvVar('OPENAI_MAX_BATCH_SIZE', '15'), 10);
