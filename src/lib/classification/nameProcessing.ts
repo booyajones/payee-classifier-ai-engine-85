@@ -16,8 +16,8 @@ export function normalizePayeeName(name: string): string {
     .toUpperCase()
     // Normalize UTF-8 characters
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    // Remove common punctuation
-    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
+    // Remove common punctuation including apostrophes and hyphens
+    .replace(/[-\\',./#!$%^&*;:{}=_`~()]/g, ' ')
     // Replace multiple spaces with a single space
     .replace(/\s+/g, ' ')
     // Trim leading/trailing whitespace
