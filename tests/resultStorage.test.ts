@@ -6,25 +6,29 @@ vi.mock('@/lib/backend', () => {
     rows.map((r, idx) => ({ ...r, id: idx + 1 }))
   );
   const upsertClassifications = vi.fn().mockResolvedValue(undefined);
+  const upsertDedupeLinks = vi.fn().mockResolvedValue(undefined);
+  const fetchDedupeMap = vi.fn().mockResolvedValue(new Map());
   return {
     isSupabaseConfigured: () => true,
     upsertUploadBatch,
     upsertUploadRows,
     upsertClassifications,
+    upsertDedupeLinks,
+    fetchDedupeMap,
     supabase: {},
   };
 });
 
 import { saveProcessingResults } from '@/lib/storage/resultStorage';
 import type { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { upsertUploadRows, upsertClassifications } from '@/lib/backend';
+import { upsertUploadRows, upsertClassifications, upsertDedupeLinks } from '@/lib/backend';
 
 describe('saveProcessingResults', () => {
-  it('persists payee_name and normalized_name', async () => {
+  it('deduplicates payees and persists dedupe links', async () => {
     const results: PayeeClassification[] = [
       {
         id: '1',
-        payeeName: 'Acme LLC',
+        payeeName: 'Acme Electric',
         result: {
           classification: 'Business',
           confidence: 1,
@@ -36,7 +40,7 @@ describe('saveProcessingResults', () => {
       },
       {
         id: '2',
-        payeeName: 'Acme',
+        payeeName: 'Acme Electrical',
         result: {
           classification: 'Business',
           confidence: 1,
@@ -60,25 +64,27 @@ describe('saveProcessingResults', () => {
     const batchId = await saveProcessingResults(results, summary);
     expect(batchId).toBe('batch123');
 
-    // upload rows should be sent in a single batch
+    // Only one canonical row should be inserted
     expect(upsertUploadRows).toHaveBeenCalledTimes(1);
     const savedRows = (upsertUploadRows as any).mock.calls[0][0] as any[];
-
+    expect(savedRows).toHaveLength(1);
     expect(savedRows[0]).toMatchObject({
-      payee_name: 'Acme LLC',
-      normalized_name: 'ACME',
+      payee_name: 'Acme Electric',
+      normalized_name: 'ACME ELECTRIC',
     });
-    expect(savedRows[1]).toMatchObject({
-      payee_name: 'Acme',
-      normalized_name: 'ACME',
-    });
-    expect(savedRows[0].normalized_name).toBe(savedRows[1].normalized_name);
 
-    // classifications should also be buffered and saved once
+    // Classifications correspond to deduplicated rows
     expect(upsertClassifications).toHaveBeenCalledTimes(1);
     const savedClassifications = (upsertClassifications as any).mock.calls[0][0] as any[];
-    expect(savedClassifications).toHaveLength(2);
-    expect(savedClassifications[0]).toMatchObject({ prompt_version: 1 });
+    expect(savedClassifications).toHaveLength(1);
+
+    // Dedupe links should be persisted for duplicates
+    expect(upsertDedupeLinks).toHaveBeenCalled();
+    const linkCalls = (upsertDedupeLinks as any).mock.calls.flatMap((c: any[]) => c[0]);
+    expect(linkCalls).toContainEqual({
+      canonical_normalized: 'ACME ELECTRIC',
+      duplicate_normalized: 'ACME ELECTRICAL',
+    });
   });
 });
 

@@ -1,5 +1,5 @@
 import { PayeeClassification, BatchProcessingResult } from '@/lib/types';
-import { normalizeName } from '@/lib/classification/nameProcessing';
+import { normalizeName, deduplicateNames } from '@/lib/classification/nameProcessing';
 import { promptVersion } from '@/lib/classification/config';
 import {
   isSupabaseConfigured,
@@ -7,6 +7,7 @@ import {
   upsertUploadRows,
   upsertClassifications,
   supabase,
+  upsertDedupeLinks,
 } from '@/lib/backend';
 
 // Version of the classification prompt used when storing results
@@ -61,7 +62,34 @@ export const saveProcessingResults = async (
     processing_time_ms: summary.processingTime,
   });
 
-  const rows = results.map((r, idx) => {
+  // Group names by canonical form and track duplicates
+  const nameGroups = await deduplicateNames(results.map(r => r.payeeName));
+  const nameToCanonical = new Map<string, string>();
+  nameGroups.forEach((group, canonical) => {
+    group.forEach(name => nameToCanonical.set(name, canonical));
+  });
+
+  const dedupeLinks: { canonical_normalized: string; duplicate_normalized: string }[] = [];
+  const canonicalResults: PayeeClassification[] = [];
+  const seenCanonicals = new Set<string>();
+
+  results.forEach(r => {
+    const { normalized } = normalizeName(r.payeeName);
+    const canonical = nameToCanonical.get(r.payeeName) || normalized;
+    if (!seenCanonicals.has(canonical)) {
+      seenCanonicals.add(canonical);
+      canonicalResults.push(r);
+    } else if (normalized !== canonical) {
+      dedupeLinks.push({
+        canonical_normalized: canonical,
+        duplicate_normalized: normalized,
+      });
+    }
+  });
+
+  await upsertDedupeLinks(dedupeLinks);
+
+  const rows = canonicalResults.map((r, idx) => {
     const { normalized, hash } = normalizeName(r.payeeName);
     return {
       batch_id: batchId,
@@ -80,7 +108,7 @@ export const saveProcessingResults = async (
   const classificationBuffer = insertedRows.map((row, idx) => ({
     row_id: row.id as number,
     prompt_version: PROMPT_VERSION,
-    classification: results[idx].result,
+    classification: canonicalResults[idx].result,
     prompt_version: promptVersion,
   }));
   await upsertClassifications(classificationBuffer);
